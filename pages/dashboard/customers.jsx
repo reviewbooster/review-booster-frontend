@@ -1,0 +1,1008 @@
+/**
+ * pages/dashboard/customers.jsx
+ * Customers page — Phase 2 + CSV import (S16) + Edit customer + details nav (S17).
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import DashboardLayout from '../../components/DashboardLayout';
+import withAuth from '../../components/withAuth';
+import api from '../../lib/api';
+
+const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#0EA5E9'];
+function avatarBg(idx) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
+
+function fmtDate(d) {
+  if (!d) return '\u2014';
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function buildPages(page, total) {
+  if (total <= 6) return Array.from({ length: total }, (_, i) => i + 1);
+  if (page <= 3)       return [1, 2, 3, '_d1', total];
+  if (page >= total-2) return [1, '_d1', total-2, total-1, total];
+  return [1, '_d1', page-1, page, page+1, '_d2', total];
+}
+
+// -- Add Customer Modal --------------------------------------------------------
+function AddCustomerModal({ onClose, onCreated }) {
+  const [form,    setForm]    = useState({ name: '', phone: '+91', email: '' });
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await api.post('/customers', form);
+      onCreated(data.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to add customer.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Add Customer</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">{'\u2715'}</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && <div className="alert-error"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          <div>
+            <label className="label">Full Name *</label>
+            <input className="input" required placeholder="e.g. Priya Sharma"
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Phone (E.164 format)</label>
+            <input className="input" placeholder="+919876543210"
+              value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            <p className="text-xs text-gray-400 mt-1">Include country code, e.g. +919876543210</p>
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input className="input" type="email" placeholder="customer@gmail.com"
+              value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
+              {loading ? <><span className="spinner" />{' Adding\u2026'}</> : 'Add Customer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -- Edit Customer Modal -------------------------------------------------------
+function EditCustomerModal({ customer, onClose, onUpdated }) {
+  const [form, setForm] = useState({
+    name:      customer.name      || '',
+    phone:     customer.phone     || '',
+    email:     customer.email     || '',
+    notes:     customer.notes     || '',
+    opted_out: customer.opted_out || false,
+  });
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const payload = {
+        name:      form.name,
+        phone:     form.phone  || null,
+        email:     form.email  || null,
+        notes:     form.notes  || null,
+        opted_out: form.opted_out,
+      };
+      const { data } = await api.put('/customers/' + customer._id, payload);
+      onUpdated(data.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update customer.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-slide-up overflow-y-auto max-h-[90vh]">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Edit Customer</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">{'\u2715'}</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && <div className="alert-error"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          <div>
+            <label className="label">Full Name *</label>
+            <input className="input" required placeholder="e.g. Priya Sharma"
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Phone (E.164 format)</label>
+            <input className="input" placeholder="+919876543210"
+              value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            <p className="text-xs text-gray-400 mt-1">Include country code, e.g. +919876543210</p>
+          </div>
+          <div>
+            <label className="label">Email</label>
+            <input className="input" type="email" placeholder="customer@gmail.com"
+              value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="label">Notes</label>
+            <textarea
+              className="input resize-none"
+              rows={3}
+              placeholder="Any notes about this customer..."
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            ></textarea>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Customer Status</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {form.opted_out
+                  ? 'Inactive \u2014 will not receive requests'
+                  : 'Active \u2014 can receive requests'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, opted_out: !f.opted_out }))}
+              className={'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ' +
+                (form.opted_out ? 'bg-gray-300' : 'bg-purple-600')}
+            >
+              <span
+                className={'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ' +
+                  (form.opted_out ? 'translate-x-1' : 'translate-x-6')}
+              />
+            </button>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
+              {loading ? <><span className="spinner" />{' Saving\u2026'}</> : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -- Delete Confirm Modal ------------------------------------------------------
+function DeleteConfirmModal({ customer, onClose, onDeleted }) {
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  const handleDelete = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await api.delete('/customers/' + customer._id);
+      onDeleted(customer._id);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete customer.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-slide-up">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 text-red-500 font-bold text-lg">
+              {'!'}
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900">Delete Customer</h2>
+              <p className="text-xs text-gray-400 mt-0.5">This action cannot be undone</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mb-5">
+            {'Are you sure you want to delete '}
+            <span className="font-semibold text-gray-900">{customer.name}</span>
+            {'? All their data will be permanently removed.'}
+          </p>
+          {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={loading} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleDelete} disabled={loading}
+              className="flex-1 justify-center flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors duration-150 disabled:opacity-50">
+              {loading ? <><span className="spinner" />{' Deleting\u2026'}</> : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- Pre-filled link builder ---------------------------------------------------
+function buildPrefilledLink(channel, customer, reviewUrl) {
+  var msg = 'Hi ' + customer.name + ', please take a moment to share your feedback. It only takes 30 seconds! ' + reviewUrl;
+  if (channel === 'whatsapp') {
+    var phone = customer.phone.replace(/^\+/, '');
+    return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+  }
+  if (channel === 'sms') {
+    return 'sms:' + customer.phone + '?body=' + encodeURIComponent(msg);
+  }
+  if (channel === 'email') {
+    return 'mailto:' + customer.email +
+      '?subject=' + encodeURIComponent('We would love your feedback!') +
+      '&body='    + encodeURIComponent(msg);
+  }
+  return reviewUrl;
+}
+
+// -- Send Request Modal --------------------------------------------------------
+function SendRequestModal({ customer, onClose, onSent }) {
+  const [loadingCh, setLoadingCh] = useState(null);
+  const [error,     setError]     = useState('');
+  const [result,    setResult]    = useState(null);
+  const [copied,    setCopied]    = useState(false);
+
+  const CHANNEL_META = {
+    whatsapp: { label: 'WhatsApp', color: 'bg-green-500 hover:bg-green-600',   needs: 'phone' },
+    sms:      { label: 'SMS',      color: 'bg-blue-500 hover:bg-blue-600',     needs: 'phone' },
+    email:    { label: 'Email',    color: 'bg-purple-500 hover:bg-purple-600', needs: 'email' },
+  };
+
+  const handleSend = async (channel) => {
+    setError('');
+    setLoadingCh(channel);
+    try {
+      const { data } = await api.post('/requests', { customer_id: customer._id, channel });
+      setResult({ channel, reviewUrl: data.review_url });
+      onSent();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate link.');
+    } finally {
+      setLoadingCh(null);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!result) return;
+    try {
+      await navigator.clipboard.writeText(result.reviewUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {}
+  };
+
+  const remaining = ['whatsapp', 'sms', 'email'].filter(ch => ch !== result?.channel);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">
+              {result ? (CHANNEL_META[result.channel].label + ' Ready!') : 'Send Review Request'}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">{customer.name}</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">{'\u2715'}</button>
+        </div>
+        <div className="p-6 space-y-4">
+          {error && <div className="alert-error"><span>{'!'}</span><span>{error}</span></div>}
+          {!result ? (
+            <>
+              <p className="text-sm text-gray-500">Tap a channel to generate the review link for this customer.</p>
+              <div className="space-y-3">
+                {['whatsapp', 'sms', 'email'].map(ch => {
+                  const meta   = CHANNEL_META[ch];
+                  const noData = meta.needs === 'phone' ? !customer.phone : !customer.email;
+                  return (
+                    <button key={ch} onClick={() => handleSend(ch)} disabled={!!loadingCh || noData}
+                      className={'w-full flex items-center justify-between px-4 py-3 rounded-xl text-white text-sm font-semibold transition-colors duration-150 ' + meta.color + ' disabled:opacity-40 disabled:cursor-not-allowed'}>
+                      <span>{meta.label}</span>
+                      {loadingCh === ch
+                        ? <span className="spinner border-white/30 border-t-white" />
+                        : noData
+                          ? <span className="text-xs font-normal opacity-70">{'No ' + meta.needs}</span>
+                          : <span className="opacity-60">{'\u2192'}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={onClose} className="btn-secondary w-full justify-center">Cancel</button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0 font-bold text-sm">{'\u2713'}</div>
+                <div>
+                  <p className="text-sm font-semibold text-green-800">Link ready!</p>
+                  <p className="text-xs text-green-600 mt-0.5">Tap the button below to send the pre-filled message.</p>
+                </div>
+              </div>
+              <a href={buildPrefilledLink(result.channel, customer, result.reviewUrl)}
+                target="_blank" rel="noopener noreferrer"
+                className="btn-primary w-full flex items-center justify-center">
+                {'Open ' + CHANNEL_META[result.channel].label}
+              </a>
+              <div>
+                <p className="label mb-1">Or copy the link</p>
+                <div className="flex gap-2">
+                  <input readOnly value={result.reviewUrl} className="input text-xs flex-1 font-mono"
+                    onFocus={e => e.target.select()} />
+                  <button onClick={copyLink}
+                    className={'py-2 px-3 rounded-xl text-sm font-semibold border transition-colors duration-150 ' +
+                      (copied ? 'border-green-300 text-green-600 bg-green-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}>
+                    {copied ? '\u2713' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              {remaining.length > 0 && (
+                <div>
+                  <p className="label mb-1">Also send via</p>
+                  <div className="flex gap-2">
+                    {remaining.map(ch => {
+                      const meta   = CHANNEL_META[ch];
+                      const noData = meta.needs === 'phone' ? !customer.phone : !customer.email;
+                      return noData ? (
+                        <span key={ch} className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-100 text-gray-300 text-center">{meta.label}</span>
+                      ) : (
+                        <a key={ch} href={buildPrefilledLink(ch, customer, result.reviewUrl)}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors duration-150 text-center">
+                          {meta.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <button onClick={onClose} className="btn-secondary w-full justify-center">Done</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- Import Modal --------------------------------------------------------------
+function ImportModal({ onClose, onImported }) {
+  const [step,       setStep]       = useState(1);
+  const [file,       setFile]       = useState(null);
+  const [preview,    setPreview]    = useState(null);
+  const [uploading,  setUploading]  = useState(false);
+  const [result,     setResult]     = useState(null);
+  const [parseError, setParseError] = useState('');
+  const [dragging,   setDragging]   = useState(false);
+
+  const parseCSVPreview = (text) => {
+    const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim());
+    if (lines.length < 1) return null;
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const dataRows = lines.slice(1).map(line => line.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+    const preview5 = dataRows.slice(0, 5).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = row[i] || ''; });
+      return obj;
+    });
+    return { headers, rows: preview5, totalDataRows: dataRows.length };
+  };
+
+  const handleFile = (f) => {
+    setParseError('');
+    if (!f) return;
+    const parts = f.name.split('.');
+    const ext   = parts[parts.length - 1].toLowerCase();
+    if (ext !== 'csv' && ext !== 'xlsx') {
+      setParseError('Only .csv and .xlsx files are supported.');
+      return;
+    }
+    setFile(f);
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const p = parseCSVPreview(e.target.result);
+        if (!p) { setParseError('Could not parse CSV file.'); return; }
+        setPreview(p);
+        setStep(2);
+      };
+      reader.readAsText(f);
+    } else {
+      setPreview({ isXlsx: true, fileName: f.name, fileSize: f.size });
+      setStep(2);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+    setUploading(true);
+    setParseError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post('/customers/import', formData);
+      setResult(data);
+      setStep(3);
+      if (data.created > 0) onImported();
+    } catch (err) {
+      setParseError(err.response?.data?.error || 'Import failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csv  = 'name,phone,email\nPriya Sharma,9876543210,priya@example.com\nRaj Patel,9123456789,raj@example.com';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'customers_template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const stepLabel = step === 1 ? 'Select file' : step === 2 ? 'Confirm import' : 'Done';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">Import Customers</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{'Step ' + step + ' of 3 \u2014 ' + stepLabel}</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">{'\u2715'}</button>
+        </div>
+        <div className="p-6">
+          {step === 1 && (
+            <div className="space-y-4">
+              <div
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('rb-import-input').click()}
+                className={'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ' +
+                  (dragging ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50')}
+              >
+                <p className="text-3xl mb-2">{'\uD83D\uDCC4'}</p>
+                <p className="text-sm font-semibold text-gray-700">Drop your file here, or click to browse</p>
+                <p className="text-xs text-gray-400 mt-1">Supports .csv and .xlsx files up to 500 KB</p>
+                <input
+                  id="rb-import-input"
+                  type="file"
+                  accept=".csv,.xlsx"
+                  className="hidden"
+                  onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); }}
+                />
+              </div>
+              {parseError && (
+                <div className="alert-error"><span>{'\u26A0'}</span><span>{parseError}</span></div>
+              )}
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Required columns</p>
+                <div className="overflow-x-auto">
+                  <table className="text-xs w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-left font-semibold text-gray-700 pr-6 pb-1.5">name *</th>
+                        <th className="text-left font-semibold text-gray-700 pr-6 pb-1.5">phone *</th>
+                        <th className="text-left font-semibold text-gray-400 pb-1.5">email</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="text-gray-500">
+                        <td className="pr-6 py-0.5">Priya Sharma</td>
+                        <td className="pr-6 py-0.5">9876543210</td>
+                        <td className="py-0.5">priya@gmail.com</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">Phone: 10 digits (auto +91) or full E.164. Column headers like "Mobile", "Phone Number", "Full Name" are auto-recognised.</p>
+              </div>
+              <button onClick={downloadTemplate} className="btn-secondary w-full justify-center text-sm">
+                {'\u2B07 Download template (.csv)'}
+              </button>
+            </div>
+          )}
+          {step === 2 && preview && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-xl p-3">
+                <p className="text-2xl leading-none">{'\uD83D\uDCC4'}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{file.name}</p>
+                  <p className="text-xs text-gray-400">
+                    {(file.size / 1024).toFixed(1) + ' KB' +
+                      (preview.totalDataRows != null ? '\u00A0\u2014\u00A0' + preview.totalDataRows + ' data rows detected' : '')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setFile(null); setPreview(null); setParseError(''); setStep(1); }}
+                  className="text-xs text-purple-600 hover:underline shrink-0"
+                >
+                  Change
+                </button>
+              </div>
+              {preview.rows && preview.rows.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">
+                    {'Preview (' + preview.rows.length + ' of ' + preview.totalDataRows + ' rows)'}
+                  </p>
+                  <div className="overflow-x-auto rounded-xl border border-gray-100">
+                    <table className="text-xs w-full">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          {preview.headers.map(h => (
+                            <th key={h} className="text-left px-3 py-2 font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.rows.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-50 last:border-0">
+                            {preview.headers.map(h => (
+                              <td key={h} className="px-3 py-2 text-gray-500 max-w-[140px] truncate">{row[h] || '\u2014'}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {preview.isXlsx && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                  {'\u2139  Excel file selected. All rows will be validated during import.'}
+                </div>
+              )}
+              {parseError && (
+                <div className="alert-error"><span>{'\u26A0'}</span><span>{parseError}</span></div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setStep(1); setParseError(''); }} className="btn-secondary flex-1 justify-center">Back</button>
+                <button onClick={handleImport} disabled={uploading} className="btn-primary flex-1 justify-center">
+                  {uploading
+                    ? <><span className="spinner" />{' Importing\u2026'}</>
+                    : 'Import' + (preview.totalDataRows != null ? ' ' + preview.totalDataRows + ' rows' : '')}
+                </button>
+              </div>
+            </div>
+          )}
+          {step === 3 && result && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-50 border border-green-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-green-600">{result.created}</p>
+                  <p className="text-xs text-green-700 mt-1">Added</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-400">{result.skipped}</p>
+                  <p className="text-xs text-gray-500 mt-1">Skipped (duplicates)</p>
+                </div>
+              </div>
+              {result.errors && result.errors.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-red-500 mb-2">
+                    {result.errors.length + (result.errors.length === 1 ? ' row had issues' : ' rows had issues')}
+                  </p>
+                  <div className="max-h-40 overflow-y-auto rounded-xl border border-red-100 divide-y divide-red-50">
+                    {result.errors.map((e, i) => (
+                      <div key={i} className="flex items-start gap-2 px-3 py-2 text-xs">
+                        <span className="font-semibold text-red-400 shrink-0">{'Row ' + e.row}</span>
+                        <span className="text-gray-500">{e.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button onClick={onClose} className="btn-primary w-full justify-center">Done</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -- Customers Page ------------------------------------------------------------
+function CustomersPage() {
+  const router = useRouter();
+
+  const [customers,    setCustomers]    = useState([]);
+  const [total,        setTotal]        = useState(0);
+  const [page,         setPage]         = useState(1);
+  const [search,       setSearch]       = useState('');
+  const [activeTab,    setActiveTab]    = useState('all');
+  const [tabCounts,    setTabCounts]    = useState({ all: 0, active: 0, inactive: 0 });
+  const [countsReady,  setCountsReady]  = useState(false);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState('');
+  const [toast,        setToast]        = useState('');
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [showImport,   setShowImport]   = useState(false);
+  const [sendTarget,   setSendTarget]   = useState(null);
+  const [editTarget,   setEditTarget]   = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [menuOpenId,   setMenuOpenId]   = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  var handleExportCustomers = async function() {
+    setExportLoading(true);
+    try {
+      var res = await api.get('/customers/export', { responseType: 'blob' });
+      var url = URL.createObjectURL(res.data);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'customers-export.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+    setExportLoading(false);
+  };
+  const LIMIT = 10;
+
+  useEffect(() => {
+    const close = () => setMenuOpenId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
+  const refreshCounts = useCallback(() => {
+    Promise.all([
+      api.get('/customers?limit=1'),
+      api.get('/customers?limit=1&status=active'),
+      api.get('/customers?limit=1&status=inactive'),
+    ]).then(([a, b, c]) => {
+      setTabCounts({ all: a.data.total || 0, active: b.data.total || 0, inactive: c.data.total || 0 });
+      setCountsReady(true);
+    }).catch(() => { setCountsReady(true); });
+  }, []);
+
+  useEffect(() => { refreshCounts(); }, [refreshCounts]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ page, limit: LIMIT });
+      if (search)              params.set('search', search);
+      if (activeTab !== 'all') params.set('status', activeTab);
+      const { data } = await api.get('/customers?' + params.toString());
+      setCustomers(data.data ?? []);
+      setTotal(data.total ?? 0);
+    } catch {
+      setError('Failed to load customers.');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, activeTab]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleTabChange = (key) => { setActiveTab(key); setPage(1); };
+  const handleSearch    = (val) => { setSearch(val);    setPage(1); };
+
+  const handleDeleted = (id) => {
+    const deleted = deleteTarget;
+    setCustomers(prev => prev.filter(c => c._id !== id));
+    setTotal(t => t - 1);
+    setTabCounts(prev => {
+      const key = deleted?.opted_out ? 'inactive' : 'active';
+      return {
+        all:      Math.max(0, prev.all - 1),
+        active:   key === 'active'   ? Math.max(0, prev.active - 1)   : prev.active,
+        inactive: key === 'inactive' ? Math.max(0, prev.inactive - 1) : prev.inactive,
+      };
+    });
+    showToast('Customer deleted.');
+  };
+
+  const handleUpdated = () => {
+    load();
+    refreshCounts();
+    showToast('Customer updated!');
+  };
+
+  const totalPages = Math.ceil(total / LIMIT);
+
+  const TABS = [
+    { key: 'all',      label: 'All',      count: tabCounts.all },
+    { key: 'active',   label: 'Active',   count: tabCounts.active },
+    { key: 'inactive', label: 'Inactive', count: tabCounts.inactive },
+  ];
+
+  return (
+    <DashboardLayout>
+
+      {toast && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 z-50 alert-success shadow-lg animate-slide-up">
+          <span>{'\u2713'}</span><span>{toast}</span>
+        </div>
+      )}
+
+      {showAdd && (
+        <AddCustomerModal
+          onClose={() => setShowAdd(false)}
+          onCreated={(c) => {
+            setCustomers(prev => [c, ...prev]);
+            setTotal(t => t + 1);
+            setTabCounts(prev => ({ ...prev, all: prev.all + 1, active: prev.active + 1 }));
+            showToast('Customer added!');
+          }} />
+      )}
+      {editTarget && (
+        <EditCustomerModal
+          customer={editTarget}
+          onClose={() => setEditTarget(null)}
+          onUpdated={handleUpdated} />
+      )}
+      {sendTarget && (
+        <SendRequestModal
+          customer={sendTarget}
+          onClose={() => setSendTarget(null)}
+          onSent={() => showToast('Review link ready for ' + sendTarget.name + '!')} />
+      )}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          customer={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={handleDeleted} />
+      )}
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { load(); refreshCounts(); showToast('Import complete!'); }} />
+      )}
+
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">Customers</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExportCustomers()}
+              disabled={exportLoading}
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+              {exportLoading ? '\u2026' : 'Export'}
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+              Import
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#7C3AED' }}
+            >
+              <span className="hidden sm:inline">{'+ Add Customer'}</span>
+              <span className="sm:hidden">{'+ Add'}</span>
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-2 sm:hidden">
+          <button
+            onClick={() => handleExportCustomers()}
+            disabled={exportLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            {exportLoading ? '\u2026' : 'Export CSV'}
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+            Import CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="relative mb-4">
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+          </svg>
+        </span>
+        <input
+          className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
+          placeholder="Search by name, phone or email..."
+          value={search}
+          onChange={e => handleSearch(e.target.value)} />
+        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M11 14h2" />
+          </svg>
+        </span>
+      </div>
+
+      <div className="flex border-b border-gray-200 mb-4">
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabChange(tab.key)}
+            className={'pb-3 mr-5 text-sm font-semibold border-b-2 -mb-px transition-colors duration-150 ' +
+              (activeTab === tab.key
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600')}
+          >
+            {tab.label + (countsReady ? ' (' + tab.count.toLocaleString() + ')' : '')}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 last:border-0">
+              <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 bg-gray-200 rounded-full animate-pulse w-28" />
+                <div className="h-3 bg-gray-100 rounded-full animate-pulse w-36" />
+                <div className="h-3 bg-gray-100 rounded-full animate-pulse w-24" />
+              </div>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <div className="h-4 w-14 bg-gray-100 rounded-full animate-pulse" />
+                <div className="h-3 w-16 bg-gray-100 rounded-full animate-pulse" />
+              </div>
+            </div>
+          ))
+        ) : customers.length === 0 ? (
+          <div className="py-16 flex flex-col items-center text-center px-6">
+            <p className="text-4xl mb-3">{'\uD83D\uDC65'}</p>
+            <p className="text-sm font-semibold text-gray-700 mb-1">
+              {search ? 'No customers match your search' : 'No customers yet'}
+            </p>
+            <p className="text-xs text-gray-400">Add your first customer to start sending review requests.</p>
+          </div>
+        ) : (
+          customers.map((c, i) => (
+            <div
+              key={c._id}
+              onClick={() => router.push('/dashboard/customers/' + c._id)}
+              className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100 cursor-pointer"
+            >
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                style={{ backgroundColor: avatarBg((page - 1) * LIMIT + i) }}
+              >
+                {c.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                {c.phone && <p className="text-[11px] text-gray-400 mt-0.5">{c.phone}</p>}
+                {c.email && <p className="text-[11px] text-gray-400">{c.email}</p>}
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <div className="flex flex-col items-end gap-1 mr-2 shrink-0">
+                  <span className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' +
+                    (c.opted_out ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600')}>
+                    {c.opted_out ? 'Inactive' : 'Active'}
+                  </span>
+                  <span className="text-[10px] text-gray-400">{fmtDate(c.added_at)}</span>
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); setSendTarget(c); }}
+                  disabled={c.opted_out}
+                  title="Send Review Request"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-purple-500 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
+                  title="Delete Customer"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <div className="relative">
+                  <button
+                    onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === c._id ? null : c._id); }}
+                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-xl leading-none pb-0.5"
+                  >
+                    {'\u22EE'}
+                  </button>
+                  {menuOpenId === c._id && (
+                    <div className="absolute right-0 top-9 z-30 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-32 overflow-hidden">
+                      <button
+                        onClick={e => { e.stopPropagation(); setEditTarget(c); setMenuOpenId(null); }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-gray-400 order-2 sm:order-1">
+            {'Showing ' + ((page - 1) * LIMIT + 1) + ' to ' + Math.min(page * LIMIT, total) + ' of ' + total.toLocaleString()}
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-0.5 order-1 sm:order-2">
+              <button
+                onClick={() => setPage(p => p - 1)}
+                disabled={page === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              >
+                {'\u2039'}
+              </button>
+              {buildPages(page, totalPages).map(p =>
+                p === '_d1' || p === '_d2' ? (
+                  <span key={p} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm select-none">{'\u2026'}</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={'w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors ' +
+                      (p === page ? 'text-white' : 'text-gray-500 hover:bg-gray-100')}
+                    style={p === page ? { backgroundColor: '#7C3AED' } : {}}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page === totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              >
+                {'\u203A'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+    </DashboardLayout>
+  );
+}
+
+export default withAuth(CustomersPage);
