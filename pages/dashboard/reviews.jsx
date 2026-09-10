@@ -1,7 +1,7 @@
 /**
  * pages/dashboard/reviews.jsx
- * Reviews page â€” Phase 2 redesign.
- * Later fix â€” the date filter used to be decorative only (always showed "last 7
+ * Reviews page ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Phase 2 redesign.
+ * Later fix ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â the date filter used to be decorative only (always showed "last 7
  * days" but never actually filtered anything). It's now a real calendar-based
  * range picker, the sort button (search bar icon) actually works, header stats
  * respect all active filters, and channel filtering no longer breaks pagination.
@@ -11,7 +11,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
-import AiReplyModal from '../../components/AiReplyModal';
 import { useAuth } from '../../context/AuthContext';
 
 const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#0EA5E9'];
@@ -80,7 +79,7 @@ function channelLabel(ch) {
   return ch;
 }
 
-function ReviewDetailModal({ review, idx, onClose, onAiReply, isStaff, onThankAndRefer, referringId }) {
+function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, referringId }) {
   if (!review) return null;
   var cust = review.customer_id || {};
   var name = cust.name || 'Anonymous';
@@ -154,11 +153,6 @@ function ReviewDetailModal({ review, idx, onClose, onAiReply, isStaff, onThankAn
 
         {!isStaff && (
           <div className="px-5 pb-5 space-y-2">
-            <button
-              onClick={function() { onAiReply(review); onClose(); }}
-              className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
-              {'\u2736'} AI Reply
-            </button>
             {cust.phone && (
               <button
                 onClick={function() { onThankAndRefer(review); }}
@@ -174,9 +168,27 @@ function ReviewDetailModal({ review, idx, onClose, onAiReply, isStaff, onThankAn
   );
 }
 
+var DEFAULT_THANK_REFER_TEMPLATE = 'Hi {{name}}, thank you so much for the {{rating}}-star rating!\n\nIf you know anyone who might enjoy our service, here\'s your personal referral link to share with them:\n\n{{link}}';
+
+function fillTemplate(template, vars) {
+  var result = template;
+  Object.keys(vars).forEach(function(k) {
+    result = result.split('{{' + k + '}}').join(vars[k] == null ? '' : vars[k]);
+  });
+  return result;
+}
+
 function ReviewsPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'staff';
+  const [thankReferTemplate, setThankReferTemplate] = useState('');
+
+  useEffect(function() {
+    api.get('/business/my-settings').then(function(res) {
+      var mt = res.data && res.data.data && res.data.data.message_templates;
+      if (mt && mt.thank_refer) setThankReferTemplate(mt.thank_refer);
+    }).catch(function() {});
+  }, []);
   const [reviews,        setReviews]        = useState([]);
   const [total,          setTotal]          = useState(0);
   const [page,           setPage]           = useState(1);
@@ -197,7 +209,6 @@ function ReviewsPage() {
   const [error,          setError]          = useState('');
   const [selectedReview, setSelectedReview] = useState(null);
   const [selectedIdx,    setSelectedIdx]    = useState(0);
-  const [aiReplyReview,  setAiReplyReview]  = useState(null);
   const [exportLoading,  setExportLoading]  = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [referringId,    setReferringId]    = useState(null);
@@ -243,7 +254,7 @@ function ReviewsPage() {
     return function() { document.removeEventListener('mousedown', handler); };
   }, []);
 
-  // Stats strip â€” now respects rating/channel/date filters (previously always all-time)
+  // Stats strip ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â now respects rating/channel/date filters (previously always all-time)
   useEffect(function() {
     var params = buildFilterParams();
     if (!params.has('start_date')) params.set('days', '36500'); // effectively "all time" for the summary endpoint
@@ -337,10 +348,9 @@ function ReviewsPage() {
     try {
       var res = await api.get('/referrals/customer/' + r.customer_id._id);
       var link = window.location.origin + '/ref/' + res.data.data.code;
-      var msg = 'Hi ' + r.customer_id.name + ', thank you so much for the ' + r.rating + '-star rating! \uD83D\uDE4F' +
-        '\n\n' +
-        'If you know anyone who might enjoy our service, here\u2019s your personal referral link to share with them:' +
-        '\n' + link;
+      var msg = fillTemplate(thankReferTemplate || DEFAULT_THANK_REFER_TEMPLATE, {
+        name: r.customer_id.name, rating: r.rating, link: link
+      });
       window.open('https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg), '_blank');
     } catch (_) {}
     setReferringId(null);
@@ -367,14 +377,10 @@ function ReviewsPage() {
         review={selectedReview}
         idx={selectedIdx}
         onClose={function() { setSelectedReview(null); }}
-        onAiReply={function(r) { setAiReplyReview(r); }}
         isStaff={isStaff}
         onThankAndRefer={handleThankAndRefer}
         referringId={referringId} />
 
-      <AiReplyModal
-        review={aiReplyReview}
-        onClose={function() { setAiReplyReview(null); }} />
 
       {/* Filter row */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -649,13 +655,6 @@ function ReviewsPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                  {!isStaff && (
-                    <button
-                      onClick={function() { setAiReplyReview(r); }}
-                      className="hidden md:flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
-                      {'\u2736'} AI Reply
-                    </button>
-                  )}
                   {!isStaff && r.customer_id && r.customer_id.phone && (
                     <button
                       onClick={function() { handleThankAndRefer(r); }}
