@@ -462,6 +462,401 @@ function ViewQrModal({ business, onClose }) {
   );
 }
 
+const BILLING_PLAN_SLUGS = ['trial', 'basic', 'pro', 'agency'];
+
+function BillingSettingsModal({ onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState('');
+  const [plans,   setPlans]   = useState([]);       // [{ slug, name, price_monthly, featuresText, is_active }]
+  const [settings, setSettings] = useState({ upi_id: '', upi_payee_name: '', contact_whatsapp: '', instructions: '' });
+
+  useEffect(function() {
+    setLoading(true);
+    setError('');
+    Promise.all([
+      api.get('/admin/plans'),
+      api.get('/admin/platform-settings'),
+    ]).then(function(results) {
+      var plansData = results[0].data.data || [];
+      var settingsData = results[1].data.data || {};
+      setPlans(plansData.map(function(p) {
+        return {
+          slug: p.slug,
+          name: p.name || '',
+          price_monthly: p.price_monthly || 0,
+          featuresText: (p.features || []).join('\n'),
+          is_active: p.is_active !== false,
+        };
+      }));
+      setSettings({
+        upi_id: settingsData.upi_id || '',
+        upi_payee_name: settingsData.upi_payee_name || '',
+        contact_whatsapp: settingsData.contact_whatsapp || '',
+        instructions: settingsData.instructions || '',
+      });
+    }).catch(function() {
+      setError('Failed to load billing settings.');
+    }).finally(function() {
+      setLoading(false);
+    });
+  }, []);
+
+  function updatePlan(slug, field, value) {
+    setPlans(function(prev) {
+      return prev.map(function(p) { return p.slug === slug ? { ...p, [field]: value } : p; });
+    });
+  }
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      for (const p of plans) {
+        await api.patch('/admin/plans/' + p.slug, {
+          name: p.name,
+          price_monthly: p.price_monthly,
+          features: p.featuresText.split('\n').map(function(f) { return f.trim(); }).filter(Boolean),
+          is_active: p.is_active,
+        });
+      }
+      await api.patch('/admin/platform-settings', settings);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save billing settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Billing Settings</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">X</button>
+        </div>
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          {error && <div className="alert-error"><span>!</span><span>{error}</span></div>}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 rounded-full border-4 animate-spin"
+                style={{ borderColor: '#E9D5FF', borderTopColor: '#7C3AED' }} />
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Plans</p>
+                <div className="space-y-4">
+                  {plans.map(function(p) {
+                    return (
+                      <div key={p.slug} className="border border-gray-100 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{p.slug}</span>
+                          <label className="flex items-center gap-2 text-xs text-gray-500">
+                            <input
+                              type="checkbox"
+                              checked={p.is_active}
+                              onChange={function(e) { updatePlan(p.slug, 'is_active', e.target.checked); }}
+                            />
+                            Active
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="label">Display Name</label>
+                            <input className="input" value={p.name}
+                              onChange={function(e) { updatePlan(p.slug, 'name', e.target.value); }} />
+                          </div>
+                          <div>
+                            <label className="label">Price / month (\u20B9)</label>
+                            <input className="input" type="number" min="0" value={p.price_monthly}
+                              onChange={function(e) { updatePlan(p.slug, 'price_monthly', Number(e.target.value)); }} />
+                          </div>
+                        </div>
+                        <label className="label">Features (one per line)</label>
+                        <textarea
+                          className="input"
+                          rows={3}
+                          value={p.featuresText}
+                          onChange={function(e) { updatePlan(p.slug, 'featuresText', e.target.value); }}                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Payment Details (shown to owners)</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="label">UPI ID</label>
+                    <input className="input" placeholder="yourname@upi"
+                      value={settings.upi_id}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, upi_id: e.target.value }; }); }} />
+                  </div>
+                  <div>
+                    <label className="label">UPI Payee Name</label>
+                    <input className="input" placeholder="Adcend / ReviewBooster"
+                      value={settings.upi_payee_name}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, upi_payee_name: e.target.value }; }); }} />
+                  </div>
+                  <div>
+                    <label className="label">WhatsApp Contact Number</label>
+                    <input className="input" placeholder="+91XXXXXXXXXX"
+                      value={settings.contact_whatsapp}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, contact_whatsapp: e.target.value }; }); }} />
+                  </div>
+                  <div>
+                    <label className="label">Payment Instructions</label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      maxLength={500}
+                      placeholder="e.g. After paying, message us on WhatsApp with a screenshot to get activated faster."
+                      value={settings.instructions}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, instructions: e.target.value }; }); }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="flex gap-3 p-6 border-t border-gray-100">
+          <button onClick={onClose} disabled={saving} className="btn-secondary flex-1 justify-center">Cancel</button>
+          <button onClick={handleSave} disabled={loading || saving} className="btn-primary flex-1 justify-center">
+            {saving ? 'Saving...' : 'Save Billing Settings'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivatePlanModal({ business, onClose, onActivated }) {
+  const [plan,    setPlan]    = useState('basic');
+  const [days,    setDays]    = useState(30);
+  const [error,   setError]   = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleActivate = async () => {
+    setError('');
+    var numDays = Number(days);
+    if (!numDays || numDays < 1) { setError('Enter a valid number of days.'); return; }
+    setLoading(true);
+    try {
+      const { data } = await api.post('/admin/businesses/' + business._id + '/activate-plan', { plan, days: numDays });
+      onActivated(data.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to activate plan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-slide-up">
+        <div className="p-6">
+          <h2 className="font-bold text-gray-900 mb-1">Activate Plan</h2>
+          <p className="text-xs text-gray-400 mb-5">
+            Confirm you've received UPI payment from <span className="font-semibold text-gray-700">{business.name}</span>, then activate their plan.
+          </p>
+          {error && <div className="alert-error mb-4"><span>!</span><span>{error}</span></div>}
+          <div className="mb-4">
+            <label className="label">Plan</label>
+            <select className="input" value={plan} onChange={function(e) { setPlan(e.target.value); }}>
+              {BILLING_PLAN_SLUGS.map(function(slug) {
+                return <option key={slug} value={slug}>{slug.charAt(0).toUpperCase() + slug.slice(1)}</option>;
+              })}
+            </select>
+          </div>
+          <div className="mb-5">
+            <label className="label">Duration (days)</label>
+            <input className="input" type="number" min="1" value={days}
+              onChange={function(e) { setDays(e.target.value); }} />
+            <p className="text-xs text-gray-400 mt-1">e.g. 30 for a month, 365 for a year.</p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={loading} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleActivate} disabled={loading} className="btn-primary flex-1 justify-center">
+              {loading ? 'Activating...' : 'Activate'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusinessReferralAdminModal({ onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState('');
+  const [settings, setSettings] = useState({
+    referrer_reward_type: 'discount_pct',
+    referrer_reward_value: 20,
+    referrer_reward_text: '',
+    referred_discount_pct: 10,
+  });
+  const [signups,        setSignups]        = useState([]);
+  const [signupsLoading, setSignupsLoading] = useState(true);
+  const [creditingId,    setCreditingId]    = useState(null);
+
+  useEffect(function() {
+    setLoading(true);
+    setError('');
+    api.get('/admin/business-referral-settings')
+      .then(function(res) { setSettings(res.data.data); })
+      .catch(function() { setError('Failed to load settings.'); })
+      .finally(function() { setLoading(false); });
+
+    setSignupsLoading(true);
+    api.get('/admin/business-referrals')
+      .then(function(res) { setSignups(res.data.data || []); })
+      .catch(function() {})
+      .finally(function() { setSignupsLoading(false); });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await api.patch('/admin/business-referral-settings', settings);
+      onSaved();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMarkCredited = async (id) => {
+    setCreditingId(id);
+    try {
+      await api.post('/admin/business-referrals/' + id + '/mark-credited');
+      setSignups(function(prev) {
+        return prev.map(function(s) { return s._id === id ? { ...s, credited: true, credited_at: new Date().toISOString() } : s; });
+      });
+    } catch (err) {
+      // no-op; the row just stays as pending, they can retry
+    } finally {
+      setCreditingId(null);
+    }
+  };
+
+  var pending = signups.filter(function(s) { return !s.credited; });
+  var credited = signups.filter(function(s) { return s.credited; });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Business Referrals (Engine B)</h2>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">X</button>
+        </div>
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          {error && <div className="alert-error"><span>!</span><span>{error}</span></div>}
+
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Settings</p>
+            {loading ? (
+              <div className="h-24 bg-gray-50 rounded-xl animate-pulse" />
+            ) : (
+              <div className="border border-gray-100 rounded-xl p-4 space-y-3">
+                <div>
+                  <label className="label">Reward text shown to the referring business</label>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    value={settings.referrer_reward_text}
+                    onChange={function(e) { setSettings(function(s) { return { ...s, referrer_reward_text: e.target.value }; }); }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Reward type</label>
+                    <select
+                      className="input"
+                      value={settings.referrer_reward_type}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, referrer_reward_type: e.target.value }; }); }}
+                    >
+                      <option value="discount_pct">% off next renewal</option>
+                      <option value="free_days">Free days</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Reward value</label>
+                    <input
+                      className="input" type="number" min="0"
+                      value={settings.referrer_reward_value}
+                      onChange={function(e) { setSettings(function(s) { return { ...s, referrer_reward_value: Number(e.target.value) }; }); }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">New business's one-time signup discount (%)</label>
+                  <input
+                    className="input" type="number" min="0" max="100"
+                    value={settings.referred_discount_pct}
+                    onChange={function(e) { setSettings(function(s) { return { ...s, referred_discount_pct: Number(e.target.value) }; }); }}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Auto-shown on their first plan's payment screen. Payment itself is still manual.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              {'Pending Credits' + (pending.length > 0 ? ' (' + pending.length + ')' : '')}
+            </p>
+            {signupsLoading ? (
+              <div className="h-16 bg-gray-50 rounded-xl animate-pulse" />
+            ) : pending.length === 0 ? (
+              <p className="text-xs text-gray-400">No pending credits right now.</p>
+            ) : (
+              <div className="space-y-2">
+                {pending.map(function(s) {
+                  return (
+                    <div key={s._id} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-amber-50">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{s.referrer_name}</p>
+                        <p className="text-xs text-gray-500">{'referred ' + s.new_business_name}</p>
+                      </div>
+                      <button
+                        onClick={function() { handleMarkCredited(s._id); }}
+                        disabled={creditingId === s._id}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      >
+                        {creditingId === s._id ? '...' : 'Mark Credited'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {credited.length > 0 && (
+              <p className="text-xs text-gray-400 mt-3">{credited.length + ' already credited.'}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-3 p-6 border-t border-gray-100">
+          <button onClick={onClose} disabled={saving} className="btn-secondary flex-1 justify-center">Close</button>
+          <button onClick={handleSave} disabled={loading || saving} className="btn-primary flex-1 justify-center">
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPage() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -476,6 +871,16 @@ function AdminPage() {
   const [editUrlTarget, setEditUrlTarget] = useState(null);
   const [suspendTarget, setSuspendTarget] = useState(null);
   const [qrTarget,      setQrTarget]      = useState(null);
+  const [activateTarget,      setActivateTarget]      = useState(null);
+  const [showBillingSettings, setShowBillingSettings] = useState(false);
+  const [showBusinessReferrals, setShowBusinessReferrals] = useState(false);
+  const [stats, setStats] = useState(null);
+
+  useEffect(function() {
+    api.get('/admin/dashboard-stats')
+      .then(function(res) { setStats(res.data.data); })
+      .catch(function() {});
+  }, []);
 
   useEffect(() => {
     if (user && user.role !== "super_admin") router.replace("/dashboard");
@@ -548,14 +953,62 @@ function AdminPage() {
           onClose={() => setQrTarget(null)}
         />
       )}
+      {showBillingSettings && (
+        <BillingSettingsModal
+          onClose={() => setShowBillingSettings(false)}
+          onSaved={() => showToast("Billing settings saved.")}
+        />
+      )}
+      {showBusinessReferrals && (
+        <BusinessReferralAdminModal
+          onClose={() => setShowBusinessReferrals(false)}
+          onSaved={() => showToast("Business referral settings saved.")}
+        />
+      )}
+      {activateTarget && (
+        <ActivatePlanModal
+          business={activateTarget}
+          onClose={() => setActivateTarget(null)}
+          onActivated={(updated) => {
+            setBusinesses(prev => prev.map(b => b._id === activateTarget._id ? { ...b, plan: updated.plan, plan_expires_at: updated.plan_expires_at, trial_ends_at: updated.trial_ends_at, is_suspended: updated.is_suspended } : b));
+            showToast("Plan activated.");
+          }}
+        />
+      )}
 
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Admin Panel</h1>
           <p className="page-subtitle">{businesses.length} business{businesses.length !== 1 ? "es" : ""} registered</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary">+ Create Business</button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => setShowBillingSettings(true)} className="btn-secondary">Billing Settings</button>
+          <button onClick={() => setShowBusinessReferrals(true)} className="btn-secondary">Business Referrals</button>
+          <a href="/dashboard/admin/audit-log" className="btn-secondary">Audit Log</a>
+          <button onClick={() => setShowCreate(true)} className="btn-primary">+ Create Business</button>
+        </div>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <p className="text-xl font-bold text-gray-900">{stats.businesses.total}</p>
+            <p className="text-[11px] text-gray-400 mt-1">{stats.businesses.trial + ' trial \u00b7 ' + stats.businesses.paid + ' paid \u00b7 ' + stats.businesses.suspended + ' suspended'}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <p className="text-xl font-bold text-gray-900">{stats.customers.total}</p>
+            <p className="text-[11px] text-gray-400 mt-1">Total customers</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <p className="text-xl font-bold text-gray-900">{stats.reviews.avg_rating != null ? stats.reviews.avg_rating + ' \u2605' : '\u2014'}</p>
+            <p className="text-[11px] text-gray-400 mt-1">{stats.reviews.unresolved + ' unresolved feedback'}</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4">
+            <p className="text-xl font-bold text-gray-900">{stats.businesses.expiring_soon}</p>
+            <p className="text-[11px] text-gray-400 mt-1">{'Expiring soon \u00b7 ' + stats.referrals.pending_business_credits + ' pending credits'}</p>
+          </div>
+        </div>
+      )}
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
 
@@ -577,7 +1030,7 @@ function AdminPage() {
           <div key={b._id} className={"bg-white rounded-xl border border-gray-100 p-4 " + (b.is_suspended ? "opacity-60" : "")}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0 mr-3">
-                <p className="font-semibold text-gray-900 truncate">{b.name}</p>
+                <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 truncate hover:text-purple-600 hover:underline block">{b.name}</a>
                 <p className="text-xs text-gray-400 font-mono mt-0.5 truncate">{b._id}</p>
               </div>
               {b.is_suspended
@@ -620,6 +1073,10 @@ function AdminPage() {
                   Delete
                 </button>
               </div>
+              <button onClick={() => setActivateTarget(b)}
+                className="w-full py-2 px-3 text-xs font-semibold rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors">
+                Activate Plan
+              </button>
             </div>
           </div>
         ))}
@@ -651,7 +1108,7 @@ function AdminPage() {
             ) : businesses.map(b => (
               <tr key={b._id} className={b.is_suspended ? "opacity-60" : ""}>
                 <td>
-                  <span className="font-semibold text-gray-900">{b.name}</span>
+                  <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 hover:text-purple-600 hover:underline">{b.name}</a>
                   <p className="text-xs text-gray-400 font-mono mt-0.5">{b._id}</p>
                 </td>
                 <td><span className="badge badge-green capitalize">{b.type}</span></td>
@@ -690,6 +1147,10 @@ function AdminPage() {
                     <button onClick={() => setDeleteTarget(b)}
                       className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors duration-150">
                       Delete
+                    </button>
+                    <button onClick={() => setActivateTarget(b)}
+                      className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors duration-150">
+                      Activate Plan
                     </button>
                   </div>
                 </td>

@@ -15,13 +15,42 @@ const OWNER_NAV = [
 ];
 
 const OWNER_SECONDARY_NAV = [
-  { href: "/dashboard/settings", icon: "\u2699", label: "Settings" },
+  { href: "/dashboard/team",              icon: "\uD83D\uDC65", label: "Team",              ownerOnly: true },
+  { href: "/dashboard/referrals",         icon: "\uD83C\uDF81", label: "Referrals",         ownerOnly: false },
+  { href: "/dashboard/refer-a-business",  icon: "\uD83C\uDF1F", label: "Refer a Business",  ownerOnly: true },
+  { href: "/dashboard/win-back",          icon: "\uD83D\uDC8C", label: "Win-Back",          ownerOnly: true },
+  { href: "/dashboard/settings",          icon: "\u2699",        label: "Settings",          ownerOnly: true },
 ];
+// Flat list â€” used for mobile bottom nav (grouping doesn't fit there).
+// Only links to pages that actually exist; more groups from the Super
+// Admin doc (Customers, Reviews, Feedback, Users & Staff, Settings,
+// System Health) get added here once those pages are built.
 const ADMIN_NAV = [
-  { href: "/dashboard/admin",              icon: "\u2699",        label: "Admin",        mobileLabel: "Admin",     activeClass: "bg-purple-50 text-purple-600" },
+  { href: "/dashboard/admin/dashboard",    icon: "\uD83D\uDCCA", label: "Dashboard",    mobileLabel: "Dashboard", activeClass: "bg-purple-50 text-purple-600" },
+  { href: "/dashboard/admin",              icon: "\uD83C\uDFE2", label: "Businesses",   mobileLabel: "Businesses", activeClass: "bg-blue-50 text-blue-600" },
   { href: "/dashboard/admin/approvals",    icon: "\u2713",        label: "Approvals",    mobileLabel: "Approvals", activeClass: "bg-green-50 text-green-600",  pendingBadge: true },
-  { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates", mobileLabel: "Templates", activeClass: "bg-purple-50 text-purple-600" },
   { href: "/dashboard/requests",           icon: "\uD83D\uDD13", label: "Requests",     mobileLabel: "Requests",  activeClass: "bg-amber-50 text-amber-600", count: true },
+];
+
+// Grouped â€” used for the desktop sidebar, matching the Super Admin doc's
+// section headers (Overview / Business / Growth / Operations / System).
+const ADMIN_NAV_GROUPS = [
+  { header: "Overview", items: [
+    { href: "/dashboard/admin/dashboard", icon: "\uD83D\uDCCA", label: "Dashboard" },
+  ]},
+  { header: "Business", items: [
+    { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "Businesses" },
+  ]},
+  { header: "Growth", items: [
+    { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates" },
+  ]},
+  { header: "Operations", items: [
+    { href: "/dashboard/admin/approvals", icon: "\u2713", label: "Approvals" },
+    { href: "/dashboard/requests", icon: "\uD83D\uDD13", label: "Requests" },
+  ]},
+  { header: "System", items: [
+    { href: "/dashboard/admin/audit-log", icon: "\uD83D\uDCCB", label: "Audit Log" },
+  ]},
 ];
 
 function HomeIcon({ active }) {
@@ -112,6 +141,25 @@ function FlagNavIcon({ active }) {
   );
 }
 
+function Logo({ size }) {
+  var s = size || 32;
+  return (
+    <svg width={s} height={s} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="rbLogoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#8B5CF6" />
+          <stop offset="1" stopColor="#6D28D9" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="9" fill="url(#rbLogoGrad)" />
+      <path
+        d="M10 22V10h5.2c1.6 0 2.9.4 3.7 1.2.7.7 1.1 1.6 1.1 2.7 0 1.5-.7 2.6-2 3.2l2.4 4.9h-3l-2.1-4.4h-2.2V22H10zm3.1-6.9h1.9c.7 0 1.2-.1 1.6-.4.4-.3.5-.7.5-1.2s-.2-.9-.5-1.2c-.4-.3-.9-.4-1.6-.4h-1.9v3.2z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
 function BellIcon() {
   return (
     <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -160,6 +208,9 @@ const NAV_ICONS = {
 export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) {
   const router = useRouter();
   const { user, logout } = useAuth();
+  var visibleSecondaryNav = OWNER_SECONDARY_NAV.filter(function(item) {
+    return !item.ownerOnly || user?.role !== "staff";
+  });
   const [dropdownOpen,       setDropdownOpen]       = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [drawerOpen,         setDrawerOpen]         = useState(false);
@@ -246,13 +297,13 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
 
   return (
     <>
-      {/* ── DESKTOP SIDEBAR ────────────────────────────────────────────────── */}
+      {/* â”€â”€ DESKTOP SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 bg-white border-r border-gray-100 flex-col z-30">
 
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <span className="text-2xl">{"\u2B50"}</span>
+              <span className="text-2xl"><Logo size={28} /></span>
               <span className="text-gray-900 font-bold text-lg tracking-tight">
                 Review<span className="text-brand-500">Booster</span>
               </span>
@@ -282,24 +333,31 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {user?.role === "super_admin" ? (
-            ADMIN_NAV.map(function({ href, icon, label, activeClass, count, pendingBadge }) {
-              var active    = isAdminActive(href);
-              var itemCount = count ? resetRequestCount : (pendingBadge ? pendingCount : 0);
+            ADMIN_NAV_GROUPS.map(function(group) {
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={"flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative " +
-                    (active ? activeClass : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-                >
-                  <span className="text-base">{icon}</span>
-                  <span>{label}</span>
-                  {itemCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                      {itemCount > 99 ? "99+" : itemCount}
-                    </span>
-                  )}
-                </Link>
+                <div key={group.header} className="mb-3 last:mb-0">
+                  <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.header}</p>
+                  {group.items.map(function({ href, icon, label, count, pendingBadge }) {
+                    var active    = isAdminActive(href);
+                    var itemCount = count ? resetRequestCount : (pendingBadge ? pendingCount : 0);
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={"flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative " +
+                          (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
+                      >
+                        <span className="text-base">{icon}</span>
+                        <span>{label}</span>
+                        {itemCount > 0 && (
+                          <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                            {itemCount > 99 ? "99+" : itemCount}
+                          </span>
+                                                )}
+                      </Link>
+                    );
+                  })}
+                </div>
               );
             })
           ) : (
@@ -330,7 +388,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         {user?.role !== "super_admin" && (
   <div className="px-3 pb-2">
     <div className="h-px bg-gray-100 mb-2" />
-    {OWNER_SECONDARY_NAV.map(({ href, icon, label }) => {
+    {visibleSecondaryNav.map(({ href, icon, label }) => {
       const active = isActive(href);
       return (
         <Link
@@ -388,7 +446,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         </div>
       </aside>
 
-      {/* ── MOBILE TOP BAR ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ MOBILE TOP BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 z-30 items-center justify-between px-4">
         <div className="flex items-center gap-3">
           <button
@@ -398,7 +456,8 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
           >
             <HamburgerIcon />
           </button>
-          <span className="font-bold text-base tracking-tight">
+          <span className="font-bold text-base tracking-tight flex items-center gap-1.5">
+            <Logo size={20} />
             <span className="text-gray-900">Review</span><span style={{ color: "#7C3AED" }}>Booster</span>
           </span>
         </div>
@@ -450,7 +509,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         </div>
       </div>
 
-      {/* ── MOBILE BOTTOM NAV ──────────────────────────────────────────────── */}
+      {/* â”€â”€ MOBILE BOTTOM NAV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <nav className="flex md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30">
         {user?.role === "super_admin" ? (
           <div className="flex justify-around w-full py-1">
@@ -502,7 +561,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         )}
       </nav>
 
-      {/* ── MOBILE DRAWER ──────────────────────────────────────────────────── */}
+      {/* â”€â”€ MOBILE DRAWER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         className={"fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 " + (drawerOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none")}
         onClick={function() { setDrawerOpen(false); }}
@@ -512,7 +571,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       >
         <div className="flex items-center justify-between px-5 h-14 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{"\u2B50"}</span>
+            <span className="text-xl"><Logo size={24} /></span>
             <span className="font-bold text-base tracking-tight">
               <span className="text-gray-900">Review</span><span style={{ color: "#7C3AED" }}>Booster</span>
             </span>
@@ -576,7 +635,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         {user?.role !== "super_admin" && (
   <div className="px-3 pb-2">
     <div className="h-px bg-gray-100 mb-2" />
-    {OWNER_SECONDARY_NAV.map(({ href, icon, label }) => {
+    {visibleSecondaryNav.map(({ href, icon, label }) => {
       const active = isActive(href);
       return (
         <Link

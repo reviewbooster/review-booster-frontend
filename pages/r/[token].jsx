@@ -14,12 +14,21 @@ import api from '../../lib/api';
 const SCREEN = {
   LOADING:       'loading',
   INVALID:       'invalid',
+  IDENTIFY:      'identify',
   RATE:          'rate',
   FEEDBACK:      'feedback',
   THANK_PUBLIC:  'thank_pub',
   THANK_PRIVATE: 'thank_priv',
   ALREADY_DONE:  'done',
 };
+
+const QUICK_TAGS = [
+  { label: 'Staff',       phrase: 'Staff was rude' },
+  { label: 'Wait Time',   phrase: 'Had to wait too long' },
+  { label: 'Pricing',     phrase: 'Felt overpriced' },
+  { label: 'Cleanliness', phrase: "Place wasn't clean" },
+  { label: 'Quality',     phrase: 'Quality was poor' },
+];
 
 function GoogleLogo() {
   return (
@@ -56,7 +65,7 @@ function BusinessHeader({ business }) {
       className="pt-12 pb-16 flex flex-col items-center px-5"
       style={{ background: 'linear-gradient(135deg,#7C3AED 0%,#4F46E5 100%)' }}
     >
-      <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4">
+      <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4 animate-pop-in">
         {business.brand_logo_url ? (
           <img
             src={business.brand_logo_url}
@@ -69,8 +78,8 @@ function BusinessHeader({ business }) {
           </span>
         )}
       </div>
-      <h1 className="text-white font-bold text-xl mb-1 text-center">{business.name}</h1>
-      <p className="text-center" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+      <h1 className="text-white font-bold text-xl mb-1 text-center animate-fade-in" style={{ animationDelay: '150ms' }}>{business.name}</h1>
+      <p className="text-center animate-fade-in" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', animationDelay: '250ms' }}>
         Your feedback helps us improve
       </p>
     </div>
@@ -86,6 +95,11 @@ export default function PublicReviewPage() {
   const [rating,       setRating]       = useState(0);
   const [feedbackText, setFeedbackText] = useState('');
   const [submitting,   setSubmitting]   = useState(false);
+  const [idName,       setIdName]       = useState('');
+  const [idCountryCode, setIdCountryCode] = useState('+91');
+  const [idPhone,      setIdPhone]      = useState('');
+  const [idSubmitting, setIdSubmitting] = useState(false);
+  const [idError,      setIdError]      = useState('');
 
   useEffect(function () {
     if (!token) return;
@@ -97,7 +111,7 @@ export default function PublicReviewPage() {
           google_review_url: res.data.data.google_review_url,
           brand_logo_url:    res.data.data.logo_url || null,
         });
-        setScreen(SCREEN.RATE);
+        setScreen(res.data.data.customer_name ? SCREEN.RATE : SCREEN.IDENTIFY);
       } catch (err) {
         if (err.response && err.response.status === 410) {
           setScreen(SCREEN.ALREADY_DONE);
@@ -109,13 +123,36 @@ export default function PublicReviewPage() {
     load();
   }, [token]);
 
+  var handleIdentifySubmit = async function (e) {
+    e.preventDefault();
+    if (!idName.trim()) {
+      setIdError('Please enter your name.');
+      return;
+    }
+    setIdSubmitting(true);
+    setIdError('');
+    var digits = idPhone.trim().replace(/\D/g, '');
+    var fullPhone = digits ? idCountryCode + digits : '';
+    try {
+      await api.post('/r/' + token + '/identify', { name: idName.trim(), phone: fullPhone });
+      setScreen(SCREEN.RATE);
+    } catch (err) {
+      setIdError(err.response?.data?.error || 'Something went wrong. You can still continue below.');
+    } finally {
+      setIdSubmitting(false);
+    }
+  };
+
+  var handleIdentifySkip = function () {
+    setScreen(SCREEN.RATE);
+  };
+
   var handleRatingSelect = function (r) {
     setRating(r);
-    if (r >= 4) {
-      submitReview(r, '');
-    } else {
-      setScreen(SCREEN.FEEDBACK);
-    }
+  };
+
+  var handleContinue = function () {
+    submitReview(rating, '');
   };
 
   var submitReview = async function (r, text) {
@@ -123,7 +160,11 @@ export default function PublicReviewPage() {
     try {
       await api.post('/r/' + token + '/submit', { rating: r, feedback: text });
       if (r >= 4) {
-        setScreen(SCREEN.THANK_PUBLIC);
+        if (business && business.google_review_url) {
+          window.location.href = business.google_review_url;
+        } else {
+          setScreen(SCREEN.THANK_PUBLIC);
+        }
       } else {
         setScreen(SCREEN.THANK_PRIVATE);
       }
@@ -141,6 +182,16 @@ export default function PublicReviewPage() {
   var handleFeedbackSubmit = function (e) {
     e.preventDefault();
     submitReview(rating, feedbackText);
+  };
+
+  var handleQuickTag = function (phrase) {
+    setFeedbackText(function (prev) {
+      if (prev.includes(phrase)) return prev;
+      var trimmed = prev.trim();
+      if (!trimmed) return phrase + '. ';
+      var sep = /[.!?]\s*$/.test(trimmed) ? ' ' : '. ';
+      return trimmed + sep + phrase + '. ';
+    });
   };
 
   return (
@@ -193,11 +244,75 @@ export default function PublicReviewPage() {
             </div>
           )}
 
+          {screen === SCREEN.IDENTIFY && business && (
+            <>
+              <BusinessHeader business={business} />
+              <div className="bg-white rounded-t-3xl -mt-6 px-6 pt-8 pb-8 relative">
+                <h2 className="text-lg font-bold text-gray-900 text-center mb-6">Before you rate us...</h2>
+                <form onSubmit={handleIdentifySubmit}>
+                  {idError && (
+                    <div className="bg-red-50 text-red-500 text-xs rounded-lg px-3 py-2 mb-4">{idError}</div>
+                  )}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      placeholder="Your name"
+                      value={idName}
+                      onChange={function (e) { setIdName(e.target.value); }}
+                      className="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200"
+                    />
+                  </div>
+                  <div className="mb-5 flex gap-2">
+                    <select
+                      value={idCountryCode}
+                      onChange={function (e) { setIdCountryCode(e.target.value); }}
+                      className="bg-gray-100 rounded-xl px-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 shrink-0"
+                    >
+                      <option value="+91">{'\uD83C\uDDEE\uD83C\uDDF3 +91'}</option>
+                      <option value="+1">{'\uD83C\uDDFA\uD83C\uDDF8 +1'}</option>
+                      <option value="+44">{'\uD83C\uDDEC\uD83C\uDDE7 +44'}</option>
+                      <option value="+971">{'\uD83C\uDDE6\uD83C\uDDEA +971'}</option>
+                      <option value="+65">{'\uD83C\uDDF8\uD83C\uDDEC +65'}</option>
+                      <option value="+61">{'\uD83C\uDDE6\uD83C\uDDFA +61'}</option>
+                      <option value="+92">{'\uD83C\uDDF5\uD83C\uDDF0 +92'}</option>
+                      <option value="+880">{'\uD83C\uDDE7\uD83C\uDDE9 +880'}</option>
+                      <option value="+94">{'\uD83C\uDDF1\uD83C\uDDF0 +94'}</option>
+                      <option value="+977">{'\uD83C\uDDF3\uD83C\uDDF5 +977'}</option>
+                    </select>
+                    <input
+                      type="tel"
+                      placeholder="Phone number"
+                      value={idPhone}
+                      onChange={function (e) { setIdPhone(e.target.value); }}
+                      className="flex-1 min-w-0 bg-gray-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={idSubmitting}
+                    className="w-full py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+                    style={{ backgroundColor: '#7C3AED' }}
+                  >
+                    {idSubmitting ? 'Please wait\u2026' : 'Continue'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleIdentifySkip}
+                    disabled={idSubmitting}
+                    className="w-full py-3 mt-2 text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Skip
+                  </button>
+                </form>
+              </div>
+            </>
+          )}
+
           {screen === SCREEN.RATE && business && (
             <>
               <BusinessHeader business={business} />
               <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
-                <div className="bg-white rounded-2xl shadow-lg p-6 text-center">
+                <div className="bg-white rounded-2xl shadow-lg p-6 text-center animate-slide-up" style={{ animationDelay: '150ms' }}>
                   <h2 className="font-bold text-gray-900 mb-1" style={{ fontSize: '17px' }}>
                     How was your experience?
                   </h2>
@@ -210,12 +325,79 @@ export default function PublicReviewPage() {
                       />
                     </div>
                   ) : (
-                    <StarRating value={rating} onChange={handleRatingSelect} size="lg" />
-                  )}
-                  {!submitting && (
-                    <p className="text-xs mt-5" style={{ color: '#D1D5DB' }}>
-                      {'Tap a star to continue \uD83D\uDC47'}
-                    </p>
+                    <>
+                      <StarRating value={rating} onChange={handleRatingSelect} size="lg" />
+                      <p className="text-xs mt-5" style={{ color: '#D1D5DB' }}>
+                        {rating > 0 ? 'Tap a different star to change it' : 'Tap a star to rate your experience'}
+                      </p>
+
+                      {rating >= 4 && (
+                        <button
+                          type="button"
+                          onClick={handleContinue}
+                          className="w-full mt-5 py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: '#7C3AED' }}
+                        >
+                          Continue
+                        </button>
+                      )}
+
+                      {rating >= 1 && rating <= 3 && (
+                        <div className="text-left mt-6">
+                          <p className="text-sm text-gray-400 mb-4">
+                            {'Your feedback goes directly to the team at ' + business.name + '. We\u2019ll work to make it right.'}
+                          </p>
+                          <form onSubmit={handleFeedbackSubmit}>
+                            <p className="text-xs font-semibold text-gray-400 mb-2">
+                              {'What went wrong? Tap to add \u2014 optional'}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {QUICK_TAGS.map(function (t) {
+                                return (
+                                  <button
+                                    key={t.label}
+                                    type="button"
+                                    onClick={function () { handleQuickTag(t.phrase); }}
+                                    className="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                  >
+                                    {t.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <textarea
+                              className="input resize-none h-28 mb-1"
+                              placeholder={"Tell us what went wrong\u2026"}
+                              value={feedbackText}
+                              onChange={function (e) { setFeedbackText(e.target.value); }}
+                              maxLength={1000}
+                            />
+                            <p className="text-right text-xs text-gray-300 mb-5">
+                              {feedbackText.length + '/1000'}
+                            </p>
+                            <button
+                              type="submit"
+                              disabled={submitting}
+                              className="w-full py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                              style={{ backgroundColor: '#7C3AED' }}
+                            >
+                              {submitting
+                                ? <><span className="spinner" />{' Sending\u2026'}</>
+                                : 'Send Feedback'
+                              }
+                            </button>
+                            <a href={business.google_review_url || '#'} target="_blank" rel="noopener noreferrer"
+                              className="w-full mt-3 py-3 rounded-xl border border-gray-200 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                              <GoogleLogo />
+                              {'Leave us a review on Google'}
+                            </a>
+                            <p className="text-center text-[11px] text-gray-300 mt-2">
+                              {"It's your choice \u2014 send feedback, post publicly, or both."}
+                            </p>
+                          </form>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -229,99 +411,14 @@ export default function PublicReviewPage() {
             <>
               <BusinessHeader business={business} />
               <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
-                <div className="bg-white rounded-2xl shadow-lg p-5 text-center mb-5">
-                  <h2 className="font-bold text-gray-900 mb-1" style={{ fontSize: '15px' }}>
-                    How was your experience?
-                  </h2>
-                  <p className="text-xs text-gray-400 mb-4">Please rate your experience with us</p>
-                  <StarRating value={rating} readOnly size="lg" />
-                </div>
-                <h3 className="font-bold text-gray-900 mb-1 px-1" style={{ fontSize: '15px' }}>
-                  {"Great! We\u2019d love your review"}
-                </h3>
-                <p className="text-xs text-gray-400 mb-3 px-1">
-                  If you had a great experience, please share it on Google.
-                </p>
-                <a href={business.google_review_url} target="_blank" rel="noopener noreferrer"
-                  className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3 mb-5 hover:bg-gray-50 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <GoogleLogo />
-                  </div>
-                  <span className="font-semibold text-gray-800 text-sm flex-1 text-left">
-                    Review us on Google
-                  </span>
-                  <ChevronRight />
-                </a>
-                <h3 className="font-bold text-gray-900 mb-1 px-1" style={{ fontSize: '15px' }}>
-                  Not great?
-                </h3>
-                <p className="text-xs text-gray-400 mb-3 px-1">
-                  Let us know how we can improve your experience.
-                </p>
-                <button
-                  onClick={function () { setScreen(SCREEN.FEEDBACK); }}
-                  className="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3 w-full mb-6 hover:bg-gray-50 transition-colors"
-                >
-                  <ChatIcon />
-                  <span className="font-semibold text-gray-800 text-sm flex-1 text-left">
-                    Send Feedback Privately
-                  </span>
-                  <ChevronRight />
-                </button>
-                <p className="text-center text-sm text-gray-400 mb-1">
-                  {"Thank you for helping us improve! \uD83D\uDE4C"}
-                </p>
-              </div>
-              <p className="text-center pb-8" style={{ fontSize: '11px', color: '#D1D5DB' }}>
-                Powered by ReviewBooster
-              </p>
-            </>
-          )}
-
-          {screen === SCREEN.FEEDBACK && business && (
-            <>
-              <BusinessHeader business={business} />
-              <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
-                <div className="bg-white rounded-2xl shadow-lg p-6">
-                  <h2 className="font-bold text-gray-900 mb-1" style={{ fontSize: '17px' }}>
-                    {"We\u2019re sorry to hear that"}
-                  </h2>
-                  <p className="text-sm text-gray-400 mb-4">
-                    {'Your feedback goes directly to the team at ' + business.name + '. We\u2019ll work to make it right.'}
+                <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                  <p className="text-5xl mb-4">{'\uD83C\uDF89'}</p>
+                  <h1 className="text-xl font-bold text-gray-900 mb-2">
+                    Thanks for the great rating!
+                  </h1>
+                  <p className="text-sm text-gray-500">
+                    {'We\u2019ve let the ' + business.name + ' team know. We appreciate you taking the time.'}
                   </p>
-                  <div className="flex justify-center mb-5">
-                    <StarRating value={rating} readOnly size="md" />
-                  </div>
-                  <form onSubmit={handleFeedbackSubmit}>
-                    <textarea
-                      className="input resize-none h-28 mb-1"
-                      placeholder={"Tell us what went wrong\u2026"}
-                      value={feedbackText}
-                      onChange={function (e) { setFeedbackText(e.target.value); }}
-                      maxLength={1000}
-                    />
-                    <p className="text-right text-xs text-gray-300 mb-5">
-                      {feedbackText.length + '/1000'}
-                    </p>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-                      style={{ backgroundColor: '#7C3AED' }}
-                    >
-                      {submitting
-                        ? <><span className="spinner" />{' Sending\u2026'}</>
-                        : 'Send Feedback'
-                      }
-                    </button>
-                    <button
-                      type="button"
-                      onClick={function () { setScreen(SCREEN.RATE); }}
-                      className="w-full mt-3 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      {'\u2190 Change my rating'}
-                    </button>
-                  </form>
                 </div>
               </div>
               <p className="text-center pb-8" style={{ fontSize: '11px', color: '#D1D5DB' }}>

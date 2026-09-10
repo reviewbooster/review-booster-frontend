@@ -12,19 +12,23 @@ import api from '../../lib/api';
 
 export default function QrRedirect() {
   const router = useRouter();
-  const { qr_token } = router.query;
+  const { qr_token, t, staff } = router.query;
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!qr_token) return;
-    api.get('/r/qr/' + qr_token)
+    var params = [];
+    if (t) params.push('template=' + encodeURIComponent(t));
+    if (staff) params.push('staff=' + encodeURIComponent(staff));
+    var url = '/r/qr/' + qr_token + (params.length ? '?' + params.join('&') : '');
+    api.get(url)
       .then(function(res) {
         router.replace('/r/' + res.data.data.token);
       })
       .catch(function() {
         setError('This QR code is invalid or has been deactivated. Please ask the business for help.');
       });
-  }, [qr_token]);
+  }, [qr_token, t, staff]);
 
   return (
     <>

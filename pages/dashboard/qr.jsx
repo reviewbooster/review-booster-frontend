@@ -5,7 +5,98 @@ import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 
+// -- Staff QR Codes -------------------------------------------------------
+// Each staff-directory member can have their own QR that auto-attributes
+// the resulting review request to them — no picker needed at all, good for
+// a sticker at their own chair/station. Dynamic list (not a fixed template),
+// so unlike the print templates above, these render on the fly per name.
+function StaffQrSection({ baseQrUrl, businessName }) {
+  const [staff,   setStaff]   = useState(null); // null = loading, [] = none
+  const [copiedId, setCopiedId] = useState(null);
+
+  useEffect(function() {
+    api.get('/staff-directory')
+      .then(function(res) { setStaff(res.data.data || []); })
+      .catch(function() { setStaff([]); });
+  }, []);
+
+  if (!staff || staff.length === 0) return null;
+
+  function urlFor(staffId) {
+    return baseQrUrl + '?staff=' + staffId;
+  }
+
+  function handleCopy(staffId) {
+    navigator.clipboard.writeText(urlFor(staffId)).then(function() {
+      setCopiedId(staffId);
+      setTimeout(function() { setCopiedId(null); }, 2000);
+    }).catch(function() {});
+  }
+
+  function handleDownload(staffMember) {
+    var svgEl = document.getElementById('staff-qr-svg-' + staffMember._id);
+    if (!svgEl) return;
+    var svgData = new XMLSerializer().serializeToString(svgEl);
+    var canvas  = document.createElement('canvas');
+    canvas.width = 480; canvas.height = 480;
+    var ctx  = canvas.getContext('2d');
+    var img  = new Image();
+    var blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    var burl = URL.createObjectURL(blob);
+    img.onload = function() {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 480, 480);
+      ctx.drawImage(img, 0, 0, 480, 480);
+      URL.revokeObjectURL(burl);
+      var link = document.createElement('a');
+      link.href     = canvas.toDataURL('image/png');
+      link.download = (businessName || 'staff').replace(/\s+/g, '-').toLowerCase() + '-' + staffMember.name.replace(/\s+/g, '-').toLowerCase() + '-qr.png';
+      link.click();
+    };
+    img.src = burl;
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mt-4 md:mt-6">
+      <h2 className="text-[13px] font-bold text-gray-800 mb-1">Staff QR Codes</h2>
+      <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+        Give a staff member their own QR \u2014 anyone who scans it is automatically attributed to them, no selection needed.
+      </p>
+      <div className="space-y-3">
+        {staff.map(function(s) {
+          return (
+            <div key={s._id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+              <div className="p-1.5 rounded-lg bg-white border border-gray-100 shrink-0">
+                <QRCode id={'staff-qr-svg-' + s._id} value={urlFor(s._id)} size={48} level="H" fgColor="#111827" bgColor="#ffffff" />
+              </div>
+              <p className="text-xs font-semibold text-gray-700 flex-1 min-w-0 truncate">{s.name}</p>
+              <button
+                onClick={function() { handleCopy(s._id); }}
+                className="text-[11px] font-semibold text-purple-600 hover:underline shrink-0"
+              >
+                {copiedId === s._id ? 'Copied' : 'Copy Link'}
+              </button>
+              <button
+                onClick={function() { handleDownload(s); }}
+                className="text-[11px] font-semibold text-purple-600 hover:underline shrink-0"
+              >
+                Download
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 var TEMPLATES = ['Table Tent', 'Poster', 'Sticker', 'Counter Card'];
+var TEMPLATE_SLUGS = {
+  'Table Tent':   'table_tent',
+  'Poster':       'poster',
+  'Sticker':      'sticker',
+  'Counter Card': 'counter_card',
+};
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -175,7 +266,7 @@ function CustomTemplateCard({ template, onDownload }) {
   );
 }
 
-function AllTemplatesModal({ qrSvgId, businessName, onDownload, onCustomDownload, customTemplates, onClose }) {
+function AllTemplatesModal({ businessName, onDownload, onCustomDownload, customTemplates, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg my-4 animate-slide-up">
@@ -201,7 +292,7 @@ function AllTemplatesModal({ qrSvgId, businessName, onDownload, onCustomDownload
                 <TemplateCard
                   key={t}
                   name={t}
-                  qrSvgId={qrSvgId}
+                  qrSvgId={'qr-svg-' + TEMPLATE_SLUGS[t]}
                   businessName={businessName}
                   onDownload={onDownload}
                 />
@@ -264,6 +355,8 @@ function QrPage() {
   var reviewsGenerated = (stats && stats.total_public)                                ? stats.total_public                 : 0;
   var scansDelta       = (stats && stats.this_month && stats.this_month.total_scans)  ? stats.this_month.total_scans       : 0;
   var reviewsDelta     = (stats && stats.this_month && stats.this_month.total_public) ? stats.this_month.total_public      : 0;
+  var conversionRate   = (stats && typeof stats.conversion_rate === 'number')         ? Math.round(stats.conversion_rate * 100) : 0;
+  var totalReviewsFromScans = (stats && stats.total_reviews) ? stats.total_reviews : 0;
 
   function handleCopy() {
     navigator.clipboard.writeText(qrUrl).then(function() {
@@ -316,7 +409,7 @@ function QrPage() {
   }
 
   async function handleTemplateDownload(templateName) {
-    var svgEl = document.getElementById('business-qr-svg');
+    var svgEl = document.getElementById('qr-svg-' + TEMPLATE_SLUGS[templateName]);
     if (!svgEl || !qrData) return;
     var FULL = {
       'Table Tent':   { W: 630,  H: 892  },
@@ -396,7 +489,6 @@ function QrPage() {
 
         {showAllTemplates && qrData && (
           <AllTemplatesModal
-            qrSvgId="business-qr-svg"
             businessName={qrData.business_name}
             onDownload={handleTemplateDownload}
             onCustomDownload={handleCustomTemplateDownload}
@@ -436,6 +528,21 @@ function QrPage() {
                       fgColor="#111827"
                       bgColor="#ffffff"
                     />
+                    <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+                      {TEMPLATES.map(function(t) {
+                        return (
+                          <QRCode
+                            key={t}
+                            id={'qr-svg-' + TEMPLATE_SLUGS[t]}
+                            value={qrUrl + '?t=' + TEMPLATE_SLUGS[t]}
+                            size={190}
+                            level="H"
+                            fgColor="#111827"
+                            bgColor="#ffffff"
+                          />
+                        );
+                      })}
+                    </div>
                     <div
                       className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full flex items-center justify-center shadow-md"
                       style={{ width: '42px', height: '42px', backgroundColor: '#7C3AED' }}
@@ -509,6 +616,27 @@ function QrPage() {
                   </div>
                 </div>
 
+                <div className="rounded-xl p-3 mb-5" style={{ backgroundColor: '#F0FDF4' }}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: '#BBF7D0' }}>
+                      <svg width="13" height="13" fill="none" stroke="#16A34A" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <p className="text-[10px] font-medium text-gray-500">Conversion Rate</p>
+                  </div>
+                  {totalScans > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold text-gray-900 leading-none mb-1 tabular-nums">{conversionRate + '%'}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {totalReviewsFromScans + ' of ' + totalScans + ' scans became a review'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-400">{'Not enough data yet \u2014 no scans recorded.'}</p>
+                  )}
+                </div>
+
                 <button
                   onClick={handleDownloadPNG}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold mb-3 transition-opacity hover:opacity-90"
@@ -554,7 +682,7 @@ function QrPage() {
                       <TemplateCard
                         key={t}
                         name={t}
-                        qrSvgId="business-qr-svg"
+                        qrSvgId={'qr-svg-' + TEMPLATE_SLUGS[t]}
                         businessName={qrData.business_name}
                         onDownload={handleTemplateDownload}
                       />
@@ -567,6 +695,32 @@ function QrPage() {
               </div>
 
             </div>
+
+            {stats && stats.by_template && stats.by_template.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mt-4 md:mt-6">
+                <h2 className="text-[13px] font-bold text-gray-800 mb-3">Scans by Template</h2>
+                <p className="text-[11px] text-gray-400 mb-3 leading-relaxed">
+                  Which physical placement is actually driving scans and reviews.
+                </p>
+                <div className="space-y-2">
+                  {stats.by_template.map(function(row) {
+                    return (
+                      <div key={row.key} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+                        <p className="text-xs font-semibold text-gray-700 shrink-0">{row.label}</p>
+                        <div className="flex items-center gap-3 md:gap-4 text-[11px] text-gray-500 shrink-0">
+                          <span>{row.scans + (row.scans === 1 ? ' scan' : ' scans')}</span>
+                          <span>{row.reviews + (row.reviews === 1 ? ' review' : ' reviews')}</span>
+                          <span className="font-semibold text-gray-700">{Math.round(row.conversion_rate * 100) + '%'}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <StaffQrSection baseQrUrl={qrUrl} businessName={qrData.business_name} />
+
           </div>
         )}
 

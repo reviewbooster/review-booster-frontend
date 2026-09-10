@@ -1,9 +1,47 @@
+/**
+ * pages/dashboard/settings.jsx
+ * Reorganized into 5 sections: About Business, Account Info, Billing,
+ * Change Password, Sign Out. The old inline Team-management block was
+ * removed from here — Team now has its own dedicated page.
+ */
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
+import BillingPanel from '../../components/BillingPanel';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+
+const TYPE_LABELS = {
+  salon: 'Salon / Spa',
+  barbershop: 'Barbershop / Hair Studio',
+  gym: 'Gym / Fitness',
+  dental: 'Dental Clinic',
+  clinic: 'Medical Clinic',
+  restaurant: 'Restaurant / Cafe',
+  retail: 'Retail Store',
+  auto: 'Auto Service',
+  real_estate: 'Real Estate',
+  education: 'Education / Coaching',
+  pet_care: 'Pet Care / Veterinary',
+};
+function typeDisplayLabel(business) {
+  if (!business || !business.type) return '-';
+  if (business.type === 'other') return business.type_other || 'Other';
+  return TYPE_LABELS[business.type] || business.type;
+}
+
+var PLAN_COLORS = {
+  trial:  { bg: 'bg-amber-50',  text: 'text-amber-600' },
+  basic:  { bg: 'bg-blue-50',   text: 'text-blue-600' },
+  pro:    { bg: 'bg-indigo-50', text: 'text-indigo-600' },
+  agency: { bg: 'bg-purple-50', text: 'text-purple-600' },
+};
 
 function SettingsPage() {
+  const { user, logout } = useAuth();
+  const isStaff = user?.role === 'staff';
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState('');
@@ -12,9 +50,28 @@ function SettingsPage() {
   const [business, setBusiness] = useState(null);
   const [form, setForm] = useState({
     name: '',
+    type: '',
+    type_other: '',
     google_review_url: '',
     whatsapp_consent_required: true,
   });
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState('');
+  const [showGoogleHelp, setShowGoogleHelp] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  var googleUrlError = '';
+  var trimmedGoogleUrl = (form.google_review_url || '').trim();
+  if (trimmedGoogleUrl && !trimmedGoogleUrl.startsWith('https://')) {
+    googleUrlError = 'This must be a secure link starting with https://';
+  } else if (trimmedGoogleUrl) {
+    try {
+      new URL(trimmedGoogleUrl);
+    } catch (e) {
+      googleUrlError = "This doesn't look like a valid link -- double check you copied the whole thing.";
+    }
+  }
 
   useEffect(function() {
     var load = async function() {
@@ -24,6 +81,8 @@ function SettingsPage() {
         setBusiness(b);
         setForm({
           name: b.name || '',
+          type: b.type || '',
+          type_other: b.type_other || '',
           google_review_url: b.google_review_url || '',
           whatsapp_consent_required: !!b.whatsapp_consent_required,
         });
@@ -35,6 +94,24 @@ function SettingsPage() {
     };
     load();
   }, []);
+
+  const handleLogoChange = async (e) => {
+    var file = e.target.files[0];
+    if (!file) return;
+    setLogoError('');
+    setLogoUploading(true);
+    try {
+      var formData = new FormData();
+      formData.append('logo', file);
+      var res = await api.post('/business/my-logo', formData);
+      setBusiness((prev) => ({ ...prev, brand_logo_url: res.data.data.brand_logo_url }));
+    } catch (err) {
+      setLogoError(err.response?.data?.error || 'Failed to upload photo.');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
+    }
+  };
 
   const handleChange = (e) => {
     setSaved(false);
@@ -56,11 +133,21 @@ function SettingsPage() {
       setError('Business name cannot be empty.');
       return;
     }
+    if (googleUrlError) {
+      setError('Please fix the Google Review URL before saving.');
+      return;
+    }
+    if (form.type === 'other' && !form.type_other.trim()) {
+      setError('Please tell us what kind of business you have.');
+      return;
+    }
 
     setSaving(true);
     try {
       var res = await api.patch('/business/my-settings', {
         name: form.name,
+        type: form.type,
+        type_other: form.type === 'other' ? form.type_other : '',
         google_review_url: form.google_review_url,
         whatsapp_consent_required: form.whatsapp_consent_required,
       });
@@ -84,88 +171,184 @@ function SettingsPage() {
     );
   }
 
+  var planColor = PLAN_COLORS[business?.plan] || PLAN_COLORS.trial;
+
   return (
     <DashboardLayout>
-      <div className="p-4 md:p-6 max-w-2xl">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Settings</h1>
-        <p className="text-sm text-gray-400 mb-6">Manage your business profile and preferences</p>
+      <ChangePasswordModal isOpen={showChangePassword} onClose={function() { setShowChangePassword(false); }} />
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Business Profile</h2>
-
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Business Name</label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                placeholder="Your business name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Google Review URL</label>
-              <input
-                type="url"
-                name="google_review_url"
-                value={form.google_review_url}
-                onChange={handleChange}
-                className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                placeholder="https://g.page/r/.../review"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                {'Customers who leave a positive review get redirected here to post it on Google.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Preferences</h2>
-
-            <div className="flex items-center justify-between">
-              <div className="pr-4">
-                <p className="text-sm font-medium text-gray-900">WhatsApp Consent Required</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {'Ask customers to confirm consent before sending WhatsApp messages.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleToggle}
-                className={"relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 " +
-                  (form.whatsapp_consent_required ? "bg-purple-600" : "bg-gray-200")}
-              >
-                <span
-                  className={"inline-block h-4 w-4 transform rounded-full bg-white transition-transform " +
-                    (form.whatsapp_consent_required ? "translate-x-6" : "translate-x-1")}
-                />
+      {showSignOutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={function() { setShowSignOutConfirm(false); }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={function(e) { e.stopPropagation(); }}>
+            <h2 className="font-bold text-gray-900 mb-1">Sign Out</h2>
+            <p className="text-sm text-gray-500 mb-5">Are you sure you want to sign out?</p>
+            <div className="flex gap-3">
+              <button onClick={function() { setShowSignOutConfirm(false); }} className="btn-secondary flex-1 justify-center">Cancel</button>
+              <button onClick={logout} className="flex-1 justify-center flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors">
+                Sign Out
               </button>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Account Info</h2>
+      <div className="p-4 md:p-6 max-w-2xl">
+        <h1 className="text-xl font-bold text-gray-900 mb-1">Settings</h1>
+        <p className="text-sm text-gray-400 mb-6">Manage your business profile and account</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Business Type</p>
-                <p className="text-gray-900 font-medium capitalize">{business?.type || '-'}</p>
+        {isStaff && (
+          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-6">
+            <span className="text-blue-500 text-lg shrink-0">{'\u2139\uFE0F'}</span>
+            <p className="text-xs text-blue-700">
+              {'You have view-only access to Settings. Contact your business owner to make changes.'}
+            </p>
+          </div>
+        )}
+
+        {/* ── 1. About Business ─────────────────────────────────────────── */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 mb-3">About Business</h2>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Business Photo</h3>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-purple-50 flex items-center justify-center overflow-hidden shrink-0">
+                  {business?.brand_logo_url ? (
+                    <img src={business.brand_logo_url} alt="Business logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold text-purple-300">{(form.name || '?').charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                {!isStaff && (
+                  <div>
+                    <label className="inline-block bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-colors">
+                      {logoUploading ? 'Uploading...' : 'Change Photo'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoChange} disabled={logoUploading} />
+                    </label>
+                    <p className="text-[10px] text-gray-400 mt-1.5">JPEG, PNG, or WebP. Square photos look best.</p>
+                    {logoError && <p className="text-xs text-red-500 mt-1">{logoError}</p>}
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Plan</p>
-                <p className="text-gray-900 font-medium capitalize">{business?.plan || '-'}</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Business Profile</h3>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Business Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  disabled={isStaff}
+                  className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                  placeholder="Your business name"
+                />
               </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Business Type</label>
+                <select
+                  name="type"
+                  value={form.type}
+                  onChange={handleChange}
+                  disabled={isStaff}
+                  className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <option value="salon">Salon / Spa</option>
+                  <option value="barbershop">Barbershop / Hair Studio</option>
+                  <option value="gym">Gym / Fitness</option>
+                  <option value="dental">Dental Clinic</option>
+                  <option value="clinic">Medical Clinic</option>
+                  <option value="restaurant">Restaurant / Cafe</option>
+                  <option value="retail">Retail Store</option>
+                  <option value="auto">Auto Service</option>
+                  <option value="real_estate">Real Estate</option>
+                  <option value="education">Education / Coaching</option>
+                  <option value="pet_care">Pet Care / Veterinary</option>
+                  <option value="other">Other</option>
+                </select>
+                {form.type === 'other' && (
+                  <input
+                    type="text"
+                    name="type_other"
+                    value={form.type_other}
+                    onChange={handleChange}
+                    disabled={isStaff}
+                    placeholder="Tell us what kind of business, e.g. Photography Studio"
+                    maxLength={50}
+                    className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                  />
+                )}
+              </div>
+
               <div>
-                <p className="text-xs text-gray-400 mb-1">Trial Ends</p>
-                <p className="text-gray-900 font-medium">
-                  {business?.trial_ends_at
-                    ? new Date(business.trial_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                    : '-'}
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Google Review URL</label>
+                <input
+                  type="url"
+                  name="google_review_url"
+                  value={form.google_review_url}
+                  onChange={handleChange}
+                  disabled={isStaff}
+                  className={'w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ' +
+                    (googleUrlError ? 'ring-2 ring-red-300 focus:ring-red-300' : 'focus:ring-purple-200')}
+                  placeholder="https://g.page/r/.../review"
+                />
+                {googleUrlError && (
+                  <p className="text-xs text-red-500 mt-1.5">{googleUrlError}</p>
+                )}
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {'Customers who leave a positive review get redirected here to post it on Google.'}
                 </p>
+                {!isStaff && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={function() { setShowGoogleHelp(!showGoogleHelp); }}
+                      className="text-xs font-semibold text-purple-600 hover:text-purple-700 mt-1.5 inline-flex items-center gap-1">
+                      {showGoogleHelp ? '\u2212' : '+'} How do I find my Google Review link?
+                    </button>
+                    {showGoogleHelp && (
+                      <div className="bg-purple-50 rounded-xl p-3.5 mt-2 text-xs text-gray-700 space-y-1.5">
+                        <p className="font-semibold text-purple-700 mb-1">Follow these steps:</p>
+                        <p>{'1. Go to '}<a href="https://business.google.com" target="_blank" rel="noopener noreferrer" className="text-purple-600 underline">business.google.com</a>{' and sign in with the account that manages your business.'}</p>
+                        <p>{'2. Select your business, then look for "Get more reviews" or "Ask for reviews" on the home screen.'}</p>
+                        <p>{'3. Click it -- Google will show you a link to copy.'}</p>
+                        <p>{'4. Paste that link here.'}</p>
+                        <p className="text-gray-500 pt-1">
+                          {'Tip: the link usually starts with '}<code className="bg-white px-1 py-0.5 rounded">g.page</code>{' or '}<code className="bg-white px-1 py-0.5 rounded">search.google.com</code>{'.'}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">Preferences</h3>
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium text-gray-900">WhatsApp Consent Required</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {'Ask customers to confirm consent before sending WhatsApp messages.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggle}
+                  disabled={isStaff}
+                  className={"relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed " +
+                    (form.whatsapp_consent_required ? "bg-purple-600" : "bg-gray-200")}
+                >
+                  <span
+                    className={"inline-block h-4 w-4 transform rounded-full bg-white transition-transform " +
+                      (form.whatsapp_consent_required ? "translate-x-6" : "translate-x-1")}
+                  />
+                </button>
               </div>
             </div>
           </div>
@@ -174,20 +357,105 @@ function SettingsPage() {
             <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>
           )}
 
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-            {saved && (
-              <span className="text-sm text-green-600 font-medium">{'\u2713 Saved'}</span>
-            )}
-          </div>
-
+          {!isStaff && (
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors"
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+              {saved && (
+                <span className="text-sm text-green-600 font-medium">{'\u2713 Saved'}</span>
+              )}
+            </div>
+          )}
         </form>
+
+        {/* ── 2. Account Info ───────────────────────────────────────────── */}
+        <div className="mt-8">
+          <h2 className="text-base font-bold text-gray-900 mb-3">Account Info</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Your Name</p>
+                <p className="text-gray-900 font-medium">{user?.name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Role</p>
+                <p className="text-gray-900 font-medium capitalize">{user?.role || '-'}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Business Type</p>
+                <p className="text-gray-900 font-medium">{typeDisplayLabel(business)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Member Since</p>
+                <p className="text-gray-900 font-medium">
+                  {business?.created_at
+                    ? new Date(business.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. Billing ────────────────────────────────────────────────── */}
+        <div className="mt-8">
+          <h2 className="text-base font-bold text-gray-900 mb-3">Billing</h2>
+          {isStaff ? (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Current Plan</p>
+                  <span className={'text-sm font-semibold px-2.5 py-1 rounded-full capitalize inline-block ' + planColor.bg + ' ' + planColor.text}>
+                    {business?.plan || 'trial'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">{business?.plan === 'trial' ? 'Trial Ends' : 'Plan Expires'}</p>
+                  <p className="text-gray-900 font-medium text-sm">
+                    {business?.trial_ends_at
+                      ? new Date(business.trial_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <BillingPanel />
+          )}
+        </div>
+
+        {/* ── 4. Change Password ────────────────────────────────────────── */}
+        <div className="mt-8">
+          <h2 className="text-base font-bold text-gray-900 mb-3">Change Password</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between">
+            <p className="text-sm text-gray-500">Update the password you use to sign in.</p>
+            <button onClick={function() { setShowChangePassword(true); }} className="btn-secondary shrink-0">
+              Change Password
+            </button>
+          </div>
+        </div>
+
+        {/* ── 5. Sign Out ───────────────────────────────────────────────── */}
+        <div className="mt-8 mb-10">
+          <h2 className="text-base font-bold text-gray-900 mb-3">Sign Out</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between">
+            <p className="text-sm text-gray-500">Sign out of your ReviewBooster account on this device.</p>
+            <button
+              onClick={function() { setShowSignOutConfirm(true); }}
+              className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+
       </div>
     </DashboardLayout>
   );

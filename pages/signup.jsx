@@ -4,11 +4,18 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 
 const BUSINESS_TYPES = [
-  { value: 'gym',        label: 'Gym / Fitness' },
-  { value: 'salon',      label: 'Salon / Spa' },
-  { value: 'clinic',     label: 'Clinic / Healthcare' },
-  { value: 'restaurant', label: 'Restaurant / Cafe' },
-  { value: 'other',      label: 'Other' },
+  { value: 'salon',       label: 'Salon / Spa' },
+  { value: 'barbershop',  label: 'Barbershop / Hair Studio' },
+  { value: 'gym',         label: 'Gym / Fitness' },
+  { value: 'dental',      label: 'Dental Clinic' },
+  { value: 'clinic',      label: 'Medical Clinic' },
+  { value: 'restaurant',  label: 'Restaurant / Cafe' },
+  { value: 'retail',      label: 'Retail Store' },
+  { value: 'auto',        label: 'Auto Service' },
+  { value: 'real_estate', label: 'Real Estate' },
+  { value: 'education',   label: 'Education / Coaching' },
+  { value: 'pet_care',    label: 'Pet Care / Veterinary' },
+  { value: 'other',       label: 'Other' },
 ];
 
 export default function SignupPage() {
@@ -17,6 +24,7 @@ export default function SignupPage() {
 
   const [businessName,    setBusinessName]    = useState('');
   const [businessType,    setBusinessType]    = useState('');
+  const [businessTypeOther, setBusinessTypeOther] = useState('');
   const [ownerName,       setOwnerName]       = useState('');
   const [email,           setEmail]           = useState('');
   const [password,        setPassword]        = useState('');
@@ -26,6 +34,21 @@ export default function SignupPage() {
   const [showConfirmPw,   setShowConfirmPw]   = useState(false);
   const [error,           setError]           = useState('');
   const [loading,         setLoading]         = useState(false);
+
+  // Engine B — an incoming ?ref=CODE gets validated so we can show who
+  // referred them and what discount applies, before they submit.
+  const [refCode,     setRefCode]     = useState(null);
+  const [referrerInfo, setReferrerInfo] = useState(null);
+
+  useEffect(function() {
+    if (!router.isReady) return;
+    var q = router.query.ref;
+    if (!q || typeof q !== 'string') return;
+    setRefCode(q);
+    api.get('/business-referrals/validate/' + encodeURIComponent(q))
+      .then(function(res) { setReferrerInfo(res.data.data); })
+      .catch(function() { /* invalid/expired code — just proceed without the banner */ });
+  }, [router.isReady, router.query.ref]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -40,6 +63,10 @@ export default function SignupPage() {
       setError('Passwords do not match.');
       return;
     }
+    if (businessType === 'other' && !businessTypeOther.trim()) {
+      setError('Please tell us what kind of business you have.');
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -50,7 +77,9 @@ export default function SignupPage() {
         password,
         confirm_password: confirmPassword,
       };
+      if (businessType === 'other') payload.business_type_other = businessTypeOther.trim();
       if (googleUrl) payload.google_review_url = googleUrl;
+      if (refCode) payload.ref = refCode;
       await api.post('/auth/signup', payload);
       router.replace('/pending-approval');
     } catch (err) {
@@ -94,6 +123,18 @@ export default function SignupPage() {
             </div>
           )}
 
+          {referrerInfo && (
+            <div className="mb-5 p-3.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-sm flex items-start gap-2">
+              <span className="mt-0.5 shrink-0">{'\uD83C\uDF81'}</span>
+              <span className="text-white/80">
+                {'Referred by '}<span className="font-semibold text-white">{referrerInfo.referrer_name}</span>
+                {referrerInfo.referred_discount_pct > 0
+                  ? ' \u2014 you\u2019ll get ' + referrerInfo.referred_discount_pct + '% off your first plan.'
+                  : '.'}
+              </span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Business Name */}
@@ -126,6 +167,17 @@ export default function SignupPage() {
                   return <option key={t.value} value={t.value} className="text-gray-900 bg-white">{t.label}</option>;
                 })}
               </select>
+              {businessType === 'other' && (
+                <input
+                  type="text"
+                  required
+                  value={businessTypeOther}
+                  onChange={(e) => setBusinessTypeOther(e.target.value)}
+                  placeholder="Tell us what kind of business, e.g. Photography Studio"
+                  maxLength={50}
+                  className="w-full mt-2 px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
+                />
+              )}
             </div>
 
             {/* Your Name */}

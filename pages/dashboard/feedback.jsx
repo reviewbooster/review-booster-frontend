@@ -5,12 +5,16 @@
  * Session 19 — overflow fix, inline Resolve icon, removed three-dot.
  * Session 19b — modal: customer details, reply textarea, copy-to-clipboard.
  * Session 19c — more prominent buttons on cards and in modal.
+ * Later fix — real search/filter/sort (funnel icon used to be decorative),
+ * and a resolution trail (who resolved it, and when) on resolved items.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import StaffPicker from '../../components/StaffPicker';
+import { useAuth } from '../../context/AuthContext';
 
 // -- Helpers ------------------------------------------------------------------
 function fmtDate(d) {
@@ -28,6 +32,34 @@ function getStatus(r) {
   if (r.status === 'in_progress') return 'In Progress';
   return 'New';
 }
+
+function daysToRange(days) {
+  var end = new Date();
+  var start = new Date();
+  start.setDate(start.getDate() - (days - 1));
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+var PERIOD_OPTIONS = [
+  { days: null, label: 'All time' },
+  { days: 7,    label: 'Last 7 days' },
+  { days: 30,   label: 'Last 30 days' },
+  { days: 90,   label: 'Last 3 months' },
+];
+
+function getPresetLabel(days) {
+  if (days == null) return 'All time';
+  var r = daysToRange(days);
+  var fmt = function(s) { return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  return fmt(r.start) + '\u00a0\u2013\u00a0' + fmt(r.end) + ', ' + new Date().getFullYear();
+}
+
+var SORT_OPTIONS = [
+  { key: 'newest',      label: 'Newest first' },
+  { key: 'oldest',      label: 'Oldest first' },
+  { key: 'rating_high', label: 'Highest rating' },
+  { key: 'rating_low',  label: 'Lowest rating' },
+];
 
 function StatusBadge({ status }) {
   var styles = {
@@ -78,6 +110,29 @@ function StarRow({ rating }) {
   );
 }
 
+var TAG_COLORS = {
+  'Staff':       'bg-blue-50 text-blue-500',
+  'Wait Time':   'bg-amber-50 text-amber-600',
+  'Pricing':     'bg-purple-50 text-purple-600',
+  'Cleanliness': 'bg-teal-50 text-teal-600',
+  'Quality':     'bg-pink-50 text-pink-500',
+};
+
+function TagBadges({ tags }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <>
+      {tags.map(function(t) {
+        return (
+          <span key={t} className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (TAG_COLORS[t] || 'bg-gray-100 text-gray-500')}>
+            {t}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 function buildPages(page, total) {
   if (total <= 6) return Array.from({ length: total }, function(_, i) { return i + 1; });
   if (page <= 3)       return [1, 2, 3, '_d1', total];
@@ -86,9 +141,14 @@ function buildPages(page, total) {
 }
 
 // -- Detail / Reply modal -----------------------------------------------------
-function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
+function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
   const [reply,  setReply]  = useState('');
   const [copied, setCopied] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
+  const [resolvedBy, setResolvedBy] = useState(null);
 
   var status       = getStatus(item);
   var customer     = (item.customer_id && typeof item.customer_id === 'object') ? item.customer_id : null;
@@ -102,11 +162,26 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
     });
   };
 
-  var hasDirectChannel = (
-    (item.source === 'whatsapp' && customer && customer.phone) ||
-    (item.source === 'sms'      && customer && customer.phone) ||
-    (item.source === 'email'    && customer && customer.email)
-  );
+  var handleSuggestReply = function() {
+    setSuggesting(true);
+    setSuggestError('');
+    api.post('/reviews/' + item._id + '/generate-reply')
+      .then(function(res) { setReply(res.data?.data?.draft || ''); })
+      .catch(function(err) { setSuggestError(err.response?.data?.error || 'Failed to generate a suggestion.'); })
+      .finally(function() { setSuggesting(false); });
+  };
+
+  var handleResend = function() {
+    if (!customer) return;
+    setResending(true);
+    setResendMsg('');
+    api.post('/requests', { customer_id: customer._id, channel: item.source })
+      .then(function() { setResendMsg('New review request sent!'); })
+      .catch(function(err) { setResendMsg(err.response?.data?.error || 'Failed to resend.'); })
+      .finally(function() { setResending(false); });
+  };
+
+  var hasDirectChannel = !!(customer && (customer.phone || customer.email));
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/40 backdrop-blur-sm">
@@ -131,6 +206,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
                 <p className="text-sm font-semibold text-gray-900">{customerName}</p>
                 <StatusBadge status={status} />
                 <UrgencyBadge item={item} />
+                <TagBadges tags={item.tags} />
               </div>
               <StarRow rating={item.rating} />
               {customer && customer.phone && (
@@ -171,13 +247,36 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
             )}
           </div>
 
-          <p className="text-xs text-gray-400 mb-5">
+          <p className="text-xs text-gray-400 mb-2">
             {fmtDate(item.created_at) + ' \u00b7 via ' + sourceLabel(item.source)}
           </p>
 
+          {/* Resolution trail */}
+          {status === 'Resolved' && (
+            <p className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2 mb-3 flex items-center gap-1.5">
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              {item.resolved_by
+                ? 'Resolved by ' + item.resolved_by + (item.resolved_at ? ' on ' + fmtDate(item.resolved_at) : '')
+                : 'Marked as resolved' + (item.resolved_at ? ' on ' + fmtDate(item.resolved_at) : '')}
+            </p>
+          )}
+
           {/* Reply composer */}
           <div className="mb-5">
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Your Reply</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-gray-700">Your Reply</label>
+              {!isStaff && (
+                <button
+                  onClick={handleSuggestReply}
+                  disabled={suggesting}
+                  className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-50 flex items-center gap-1">
+                  {suggesting ? <><span className="spinner" /> Generating…</> : <>{'\u2736'} Suggest Reply</>}
+                </button>
+              )}
+            </div>
+            {suggestError && <p className="text-[10px] text-red-500 mb-1.5">{suggestError}</p>}
             <textarea
               value={reply}
               onChange={function(e) { setReply(e.target.value); }}
@@ -185,38 +284,64 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
               rows={4}
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all"
             />
-            {/* Copy button — solid purple when active, green tick when copied */}
-            <button
-              onClick={handleCopy}
-              disabled={!reply.trim()}
-              className={'w-full mt-2 flex items-center justify-center gap-2 text-sm font-semibold py-3 rounded-xl transition-colors ' +
-                (copied
-                  ? 'bg-green-500 text-white'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 disabled:cursor-not-allowed')}>
-              {copied
-                ? '\u2713 Copied to clipboard!'
-                : (
-                  <>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    {'Copy Reply'}
-                  </>
-                )}
-            </button>
+            <div className="flex gap-2 mt-2">
+              {customer && customer.phone && (
+                <a href={'https://wa.me/' + customer.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(reply)} target="_blank" rel="noopener noreferrer" className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                  WhatsApp
+                </a>
+              )}
+              {customer && customer.phone && (
+                <a href={'sms:' + customer.phone + '?body=' + encodeURIComponent(reply)} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                  SMS
+                </a>
+              )}
+              {customer && customer.email && (
+                <a href={'mailto:' + customer.email + '?subject=' + encodeURIComponent('Following up on your feedback') + '&body=' + encodeURIComponent(reply)} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                  Email
+                </a>
+              )}
+            </div>
+            {(!customer || (!customer.phone && !customer.email)) && (
+              <button
+                onClick={handleCopy}
+                disabled={!reply.trim()}
+                className={'w-full mt-2 flex items-center justify-center gap-2 text-sm font-semibold py-3 rounded-xl transition-colors ' +
+                  (copied
+                    ? 'bg-green-500 text-white'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-30 disabled:cursor-not-allowed')}>
+                {copied ? '\u2713 Copied to clipboard!' : 'Copy Reply'}
+              </button>
+            )}
             <p className="text-[10px] text-gray-400 mt-1.5 text-center">
-              {'Paste and send via WhatsApp, SMS, or Email.'}
+              {customer && (customer.phone || customer.email)
+                ? 'Opens with your reply pre-filled.'
+                : 'No contact info on file \u2014 copy and send manually.'}
             </p>
           </div>
 
           {/* Resolve + Close */}
           {status !== 'Resolved' && onResolve && (
-            <button
-              onClick={function() { onResolve(item._id); }}
-              disabled={resolving === item._id}
-              className="btn-primary w-full justify-center mb-2">
-              {resolving === item._id ? <><span className="spinner" />{' Marking\u2026'}</> : '\u2713 Mark as Resolved'}
-            </button>
+            <>
+              <StaffPicker value={resolvedBy} onChange={setResolvedBy} label="Who's handling this? (optional)" />
+              <button
+                onClick={function() { onResolve(item._id, resolvedBy); }}
+                disabled={resolving === item._id}
+                className="btn-primary w-full justify-center mb-2">
+                {resolving === item._id ? <><span className="spinner" />{' Marking\u2026'}</> : '\u2713 Mark as Resolved'}
+              </button>
+            </>
+          )}
+          {!isStaff && status === 'Resolved' && (
+            <>
+              <button
+                onClick={handleResend}
+                disabled={resending || !hasDirectChannel}
+                className="btn-primary w-full justify-center mb-2">
+                {resending ? <><span className="spinner" />{' Sending\u2026'}</> : '\u21BB Resend Request'}
+              </button>
+              {resendMsg && <p className="text-xs text-center text-gray-500 mb-2">{resendMsg}</p>}
+              {!hasDirectChannel && <p className="text-xs text-center text-gray-400 mb-2">No contact info on file to resend to.</p>}
+            </>
           )}
           <button onClick={onClose} className="btn-secondary w-full justify-center">Close</button>
         </div>
@@ -227,18 +352,36 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving }) {
 
 // -- Main page ----------------------------------------------------------------
 function FeedbackPage() {
+  const { user } = useAuth();
+  const isStaff = user?.role === 'staff';
   const [activeTab,   setActiveTab]   = useState('unresolved');
   const [items,       setItems]       = useState([]);
   const [total,       setTotal]       = useState(0);
   const [page,        setPage]        = useState(1);
+  const [search,      setSearch]      = useState('');
+  const [filter,      setFilter]      = useState({ rating: '', channel: '', tag: '' });
+  const [sort,        setSort]        = useState('newest');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [dateMode,     setDateMode]     = useState('preset');
+  const [selectedDays, setSelectedDays] = useState(null);
+  const [customDaysInput, setCustomDaysInput] = useState('');
+  const [rangeStart,   setRangeStart]   = useState('');
+  const [rangeEnd,     setRangeEnd]     = useState('');
+  const [rangeError,   setRangeError]   = useState('');
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
   const [loading,     setLoading]     = useState(true);
+  const [fetching,    setFetching]    = useState(false);
   const [error,       setError]       = useState('');
   const [counts,      setCounts]      = useState({ unresolved: 0, resolved: 0 });
   const [countsReady, setCountsReady] = useState(false);
   const [resolving,   setResolving]   = useState(null);
   const [viewItem,    setViewItem]    = useState(null);
 
+  const dateDropdownRef = useRef(null);
+  const sortMenuRef     = useRef(null);
+  const firstLoadRef    = useRef(true);
   const LIMIT = 10;
+  const today = new Date().toISOString().slice(0, 10);
 
   useEffect(function() {
     Promise.all([
@@ -250,12 +393,47 @@ function FeedbackPage() {
     }).catch(function() { setCountsReady(true); });
   }, []);
 
+  useEffect(function() {
+    function handler(e) {
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target)) setDateDropdownOpen(false);
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target)) setSortMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return function() { document.removeEventListener('mousedown', handler); };
+  }, []);
+
+  const buildFilterParams = useCallback(function() {
+    var params = new URLSearchParams();
+    if (filter.rating)  params.set('rating', filter.rating);
+    if (filter.channel) params.set('channel', filter.channel);
+    if (filter.tag)      params.set('tag', filter.tag);
+    if (search)          params.set('search', search);
+    if (dateMode === 'range' && rangeStart && rangeEnd) {
+      params.set('start_date', rangeStart);
+      params.set('end_date', rangeEnd);
+    } else if (dateMode === 'preset' && selectedDays != null) {
+      var r = daysToRange(selectedDays);
+      params.set('start_date', r.start);
+      params.set('end_date', r.end);
+    }
+    return params;
+  }, [filter, search, dateMode, selectedDays, rangeStart, rangeEnd]);
+
   const load = useCallback(async function() {
-    setLoading(true);
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false;
+      setLoading(true);
+    } else {
+      setFetching(true);
+    }
     setError('');
     try {
       var isResolved = activeTab === 'resolved' ? 'true' : 'false';
-      var params = new URLSearchParams({ page, limit: LIMIT, is_resolved: isResolved });
+      var params = buildFilterParams();
+      params.set('page', page);
+      params.set('limit', LIMIT);
+      params.set('sort', sort);
+      params.set('is_resolved', isResolved);
       var res = await api.get('/reviews/private?' + params.toString());
       setItems(res.data.data ?? []);
       setTotal(res.data.total ?? 0);
@@ -263,17 +441,54 @@ function FeedbackPage() {
       setError('Failed to load feedback.');
     } finally {
       setLoading(false);
+      setFetching(false);
     }
-  }, [page, activeTab]);
+  }, [page, activeTab, sort, buildFilterParams]);
 
   useEffect(function() { load(); }, [load]);
 
   var handleTabChange = function(tab) { setActiveTab(tab); setPage(1); };
+  var handleFilterChange = function(key, val) {
+    setFilter(function(f) { return Object.assign({}, f, { [key]: val }); });
+    setPage(1);
+  };
+  var handleSearch = function(val) { setSearch(val); setPage(1); };
 
-  var markResolved = async function(id) {
+  var handleClearAll = function() {
+    setFilter({ rating: '', channel: '', tag: '' });
+    setSearch('');
+    setSort('newest');
+    setDateMode('preset');
+    setSelectedDays(null);
+    setRangeStart('');
+    setRangeEnd('');
+    setPage(1);
+  };
+
+  var handleCustomDaysApply = function() {
+    var n = parseInt(customDaysInput, 10);
+    if (n >= 1 && n <= 365) {
+      setDateMode('preset');
+      setSelectedDays(n);
+      setDateDropdownOpen(false);
+      setCustomDaysInput('');
+      setPage(1);
+    }
+  };
+
+  var handleRangeApply = function() {
+    if (!rangeStart || !rangeEnd) { setRangeError('Pick both a start and end date.'); return; }
+    if (rangeStart > rangeEnd)    { setRangeError('Start date must be before end date.'); return; }
+    setRangeError('');
+    setDateMode('range');
+    setDateDropdownOpen(false);
+    setPage(1);
+  };
+
+  var markResolved = async function(id, resolvedBy) {
     setResolving(id);
     try {
-      await api.patch('/reviews/' + id + '/resolve');
+      await api.patch('/reviews/' + id + '/resolve', resolvedBy ? { resolved_by: resolvedBy } : {});
       setItems(function(prev) { return prev.filter(function(r) { return r._id !== id; }); });
       setTotal(function(t) { return Math.max(0, t - 1); });
       setCounts(function(prev) {
@@ -286,6 +501,11 @@ function FeedbackPage() {
       setResolving(null);
     }
   };
+
+  var hasActiveFilters = !!(filter.rating || filter.channel || filter.tag || search || dateMode === 'range' || (dateMode === 'preset' && selectedDays != null) || sort !== 'newest');
+  var dateLabel = dateMode === 'range' && rangeStart && rangeEnd
+    ? new Date(rangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '\u00a0\u2013\u00a0' + new Date(rangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : getPresetLabel(selectedDays);
 
   var totalPages = Math.ceil(total / LIMIT);
 
@@ -302,7 +522,8 @@ function FeedbackPage() {
           item={viewItem}
           onClose={function() { setViewItem(null); }}
           onResolve={markResolved}
-          resolving={resolving} />
+          resolving={resolving}
+          isStaff={isStaff} />
       )}
 
       {/* Tab bar */}
@@ -322,17 +543,165 @@ function FeedbackPage() {
             );
           })}
         </div>
-        <button className="mb-3 p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <select
+          value={filter.rating}
+          onChange={function(e) { handleFilterChange('rating', e.target.value); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
+          <option value="">All Ratings</option>
+          {[3, 2, 1].map(function(r) {
+            return <option key={r} value={r}>{r + ' Star' + (r !== 1 ? 's' : '')}</option>;
+          })}
+        </select>
+
+        <select
+          value={filter.channel}
+          onChange={function(e) { handleFilterChange('channel', e.target.value); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
+          <option value="">All Channels</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+          <option value="email">Email</option>
+          <option value="qr">QR Code</option>
+        </select>
+
+        <select
+          value={filter.tag}
+          onChange={function(e) { handleFilterChange('tag', e.target.value); }}
+          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
+          <option value="">All Categories</option>
+          <option value="Staff">Staff</option>
+          <option value="Wait Time">Wait Time</option>
+          <option value="Pricing">Pricing</option>
+          <option value="Cleanliness">Cleanliness</option>
+          <option value="Quality">Quality</option>
+        </select>
+
+        <div className="relative" ref={dateDropdownRef}>
+          <button
+            onClick={function() { setDateDropdownOpen(!dateDropdownOpen); }}
+            className={'flex items-center gap-1.5 bg-white border rounded-xl px-3 py-2 text-[11px] font-medium transition-colors ' +
+              (dateDropdownOpen ? 'border-purple-400 text-purple-600' : 'border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600')}>
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path strokeLinecap="round" d="M3 9h18M8 2v4M16 2v4" />
+            </svg>
+            {dateLabel}
+          </button>
+          {dateDropdownOpen && (
+            <div
+              className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-gray-100 shadow-lg z-50 overflow-hidden"
+              style={{ minWidth: '220px' }}>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 pt-3 pb-1">Quick ranges</p>
+              {PERIOD_OPTIONS.map(function(opt) {
+                return (
+                  <button
+                    key={opt.label}
+                    onClick={function() { setDateMode('preset'); setSelectedDays(opt.days); setDateDropdownOpen(false); setPage(1); }}
+                    className={'w-full text-left px-4 py-2.5 text-[12px] font-medium transition-colors ' +
+                      (dateMode === 'preset' && selectedDays === opt.days ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50')}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+              <div className="border-t border-gray-100 px-4 py-2.5">
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1.5">Custom (days)</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="number" min={1} max={365} placeholder="e.g. 4"
+                    value={customDaysInput}
+                    onChange={function(e) { setCustomDaysInput(e.target.value); }}
+                    onKeyDown={function(e) { if (e.key === 'Enter') handleCustomDaysApply(); }}
+                    className="w-full bg-gray-100 rounded-lg px-2.5 py-1.5 text-[12px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0" />
+                  <button onClick={handleCustomDaysApply}
+                    className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold px-3 rounded-lg transition-colors">
+                    Go
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-2">Custom date range</label>
+                {rangeError && <p className="text-[10px] text-red-500 mb-1.5">{rangeError}</p>}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] text-gray-400 block mb-0.5">From</span>
+                    <input type="date" value={rangeStart} max={rangeEnd || today}
+                      onChange={function(e) { setRangeStart(e.target.value); setRangeError(''); }}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0" />
+                  </div>
+                  <span className="text-gray-300 text-xs mt-3">{'\u2192'}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] text-gray-400 block mb-0.5">To</span>
+                    <input type="date" value={rangeEnd} min={rangeStart} max={today}
+                      onChange={function(e) { setRangeEnd(e.target.value); setRangeError(''); }}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0" />
+                  </div>
+                </div>
+                <button onClick={handleRangeApply}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold py-2 rounded-lg transition-colors">
+                  Apply Range
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={handleClearAll}
+            className="flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-gray-600 px-2 py-2 transition-colors">
+            {'\u2715'} Clear
+          </button>
+        )}
+      </div>
+
+      {/* Search + sort */}
+      <div className="relative mb-4" ref={sortMenuRef}>
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+          </svg>
+        </span>
+        <input
+          className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
+          placeholder="Search feedback..."
+          value={search}
+          onChange={function(e) { handleSearch(e.target.value); }} />
+        <button
+          type="button"
+          onClick={function() { setSortMenuOpen(!sortMenuOpen); }}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 p-1 rounded-lg transition-colors">
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M11 14h2" />
           </svg>
         </button>
+        {sortMenuOpen && (
+          <div className="absolute right-0 top-full mt-2 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 w-44">
+            {SORT_OPTIONS.map(function(opt) {
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={function() { setSort(opt.key); setSortMenuOpen(false); setPage(1); }}
+                  className={'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ' +
+                    (sort === opt.key ? 'text-purple-600 font-semibold' : 'text-gray-600')}>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
       {/* List — no overflow-hidden so nothing clips */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
+      <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 transition-opacity duration-150 ' +
+        (fetching ? 'opacity-50 pointer-events-none' : '')}>
         {loading ? (
           Array.from({ length: 4 }).map(function(_, i) {
             return (
@@ -354,10 +723,10 @@ function FeedbackPage() {
           <div className="py-16 flex flex-col items-center text-center px-6">
             <p className="text-4xl mb-3">{activeTab === 'unresolved' ? '\u2705' : '\u2713'}</p>
             <p className="text-sm font-semibold text-gray-700 mb-1">
-              {activeTab === 'unresolved' ? 'All caught up!' : 'No resolved feedback yet'}
+              {hasActiveFilters ? 'No matching feedback' : (activeTab === 'unresolved' ? 'All caught up!' : 'No resolved feedback yet')}
             </p>
             <p className="text-xs text-gray-400">
-              {activeTab === 'unresolved' ? 'No unresolved feedback. Great work!' : 'Resolved items will appear here.'}
+              {hasActiveFilters ? 'Try adjusting your filters.' : (activeTab === 'unresolved' ? 'No unresolved feedback. Great work!' : 'Resolved items will appear here.')}
             </p>
           </div>
         ) : (
@@ -380,6 +749,7 @@ function FeedbackPage() {
                     </p>
                     <StatusBadge status={status} />
                     <UrgencyBadge item={r} />
+                    <TagBadges tags={r.tags} />
                   </div>
 
                   <StarRow rating={r.rating} />
@@ -391,12 +761,30 @@ function FeedbackPage() {
                     </p>
                   )}
 
+                  {isResolved && r.resolved_by && (
+                    <p className="text-[10px] text-green-600 mt-1">
+                      {'\u2713 Resolved by ' + r.resolved_by + (r.resolved_at ? ' \u00b7 ' + fmtDate(r.resolved_at) : '')}
+                    </p>
+                  )}
+
                   {/* Date + action buttons row */}
                   <div className="flex items-center justify-between mt-3 gap-2">
                     <p className="text-[10px] text-gray-400 shrink-0">
                       {fmtDate(r.created_at) + ' \u00b7 via ' + sourceLabel(r.source)}
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
+                      {r.customer_id && r.customer_id.phone && (
+                        <a
+                          href={'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent('Hi ' + r.customer_id.name + ', thank you for your feedback \u2014 we would love the chance to make things right. Can we call you?')}
+                          target="_blank" rel="noopener noreferrer"
+                          onClick={function(e) { e.stopPropagation(); }}
+                          title="Message on WhatsApp"
+                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 transition-colors">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                          </svg>
+                        </a>
+                      )}
                       {!isResolved && (
                         <button
                           onClick={function(e) { e.stopPropagation(); markResolved(r._id); }}

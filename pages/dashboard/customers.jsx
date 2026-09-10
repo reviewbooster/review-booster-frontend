@@ -8,6 +8,8 @@ import { useRouter } from 'next/router';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+import StaffPicker from '../../components/StaffPicker';
 
 const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#0EA5E9'];
 function avatarBg(idx) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
@@ -15,6 +17,30 @@ function avatarBg(idx) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 function fmtDate(d) {
   if (!d) return '\u2014';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function timeAgo(d) {
+  if (!d) return '\u2014';
+  var then = new Date(d);
+  var now  = new Date();
+  var diffSec = Math.floor((now - then) / 1000);
+
+  if (diffSec < 0) diffSec = 0;
+
+  if (diffSec < 60) {
+    return diffSec + (diffSec === 1 ? ' second ago' : ' seconds ago');
+  }
+  var diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return diffMin + (diffMin === 1 ? ' min ago' : ' mins ago');
+  }
+  var diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) {
+    return diffHr + (diffHr === 1 ? ' hour ago' : ' hours ago');
+  }
+  var time = then.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  var date = then.toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+  return time + ' ' + date;
 }
 
 function buildPages(page, total) {
@@ -186,20 +212,11 @@ function EditCustomerModal({ customer, onClose, onUpdated }) {
 
 // -- Delete Confirm Modal ------------------------------------------------------
 function DeleteConfirmModal({ customer, onClose, onDeleted }) {
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
-
-  const handleDelete = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await api.delete('/customers/' + customer._id);
-      onDeleted(customer._id);
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete customer.');
-      setLoading(false);
-    }
+  // The actual API delete is delayed by the parent (undo window) — this modal
+  // just confirms intent and hands the customer back immediately.
+  const handleDelete = () => {
+    onDeleted(customer);
+    onClose();
   };
 
   return (
@@ -212,20 +229,19 @@ function DeleteConfirmModal({ customer, onClose, onDeleted }) {
             </div>
             <div>
               <h2 className="font-bold text-gray-900">Delete Customer</h2>
-              <p className="text-xs text-gray-400 mt-0.5">This action cannot be undone</p>
+              <p className="text-xs text-gray-400 mt-0.5">You can undo this for a few seconds after</p>
             </div>
           </div>
           <p className="text-sm text-gray-600 mb-5">
             {'Are you sure you want to delete '}
             <span className="font-semibold text-gray-900">{customer.name}</span>
-            {'? All their data will be permanently removed.'}
+            {'?'}
           </p>
-          {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
           <div className="flex gap-3">
-            <button onClick={onClose} disabled={loading} className="btn-secondary flex-1 justify-center">Cancel</button>
-            <button onClick={handleDelete} disabled={loading}
-              className="flex-1 justify-center flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors duration-150 disabled:opacity-50">
-              {loading ? <><span className="spinner" />{' Deleting\u2026'}</> : 'Delete'}
+            <button onClick={onClose} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleDelete}
+              className="flex-1 justify-center flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors duration-150">
+              Delete
             </button>
           </div>
         </div>
@@ -258,6 +274,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
   const [error,     setError]     = useState('');
   const [result,    setResult]    = useState(null);
   const [copied,    setCopied]    = useState(false);
+  const [servedBy,  setServedBy]  = useState(null);
 
   const CHANNEL_META = {
     whatsapp: { label: 'WhatsApp', color: 'bg-green-500 hover:bg-green-600',   needs: 'phone' },
@@ -269,7 +286,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
     setError('');
     setLoadingCh(channel);
     try {
-      const { data } = await api.post('/requests', { customer_id: customer._id, channel });
+      const { data } = await api.post('/requests', { customer_id: customer._id, channel, served_by: servedBy });
       setResult({ channel, reviewUrl: data.review_url });
       onSent();
     } catch (err) {
@@ -307,6 +324,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
           {!result ? (
             <>
               <p className="text-sm text-gray-500">Tap a channel to generate the review link for this customer.</p>
+              <StaffPicker value={servedBy} onChange={setServedBy} label="Who served this customer? (optional)" />
               <div className="space-y-3">
                 {['whatsapp', 'sms', 'email'].map(ch => {
                   const meta   = CHANNEL_META[ch];
@@ -631,12 +649,15 @@ function ImportModal({ onClose, onImported }) {
 // -- Customers Page ------------------------------------------------------------
 function CustomersPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isStaff = user?.role === 'staff';
 
   const [customers,    setCustomers]    = useState([]);
   const [total,        setTotal]        = useState(0);
   const [page,         setPage]         = useState(1);
   const [search,       setSearch]       = useState('');
   const [activeTab,    setActiveTab]    = useState('all');
+  const [sort,         setSort]         = useState('newest');
   const [tabCounts,    setTabCounts]    = useState({ all: 0, active: 0, inactive: 0 });
   const [countsReady,  setCountsReady]  = useState(false);
   const [loading,      setLoading]      = useState(true);
@@ -647,6 +668,14 @@ function CustomersPage() {
   const [sendTarget,   setSendTarget]   = useState(null);
   const [editTarget,   setEditTarget]   = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null); // { customer, timerId }
+  const [, setTimeTick] = useState(0);
+
+  // Force a re-render every few seconds so the relative "time ago" labels tick upward live
+  useEffect(() => {
+    const id = setInterval(() => setTimeTick((t) => t + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
   const [menuOpenId,   setMenuOpenId]   = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
 
@@ -693,7 +722,7 @@ function CustomersPage() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ page, limit: LIMIT });
+      const params = new URLSearchParams({ page, limit: LIMIT, sort });
       if (search)              params.set('search', search);
       if (activeTab !== 'all') params.set('status', activeTab);
       const { data } = await api.get('/customers?' + params.toString());
@@ -704,26 +733,48 @@ function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab]);
+  }, [page, search, activeTab, sort]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleTabChange = (key) => { setActiveTab(key); setPage(1); };
   const handleSearch    = (val) => { setSearch(val);    setPage(1); };
 
-  const handleDeleted = (id) => {
-    const deleted = deleteTarget;
-    setCustomers(prev => prev.filter(c => c._id !== id));
+  const handleDeleted = (customer) => {
+    setCustomers(prev => prev.filter(c => c._id !== customer._id));
     setTotal(t => t - 1);
     setTabCounts(prev => {
-      const key = deleted?.opted_out ? 'inactive' : 'active';
+      const key = customer?.opted_out ? 'inactive' : 'active';
       return {
         all:      Math.max(0, prev.all - 1),
         active:   key === 'active'   ? Math.max(0, prev.active - 1)   : prev.active,
         inactive: key === 'inactive' ? Math.max(0, prev.inactive - 1) : prev.inactive,
       };
     });
-    showToast('Customer deleted.');
+
+    const timerId = setTimeout(() => {
+      api.delete('/customers/' + customer._id).catch(() => { /* already removed from view either way */ });
+      setPendingDelete((cur) => (cur && cur.customer._id === customer._id ? null : cur));
+    }, 5000);
+
+    setPendingDelete({ customer, timerId });
+  };
+
+  const handleUndoDelete = () => {
+    if (!pendingDelete) return;
+    clearTimeout(pendingDelete.timerId);
+    const { customer } = pendingDelete;
+    setCustomers(prev => [customer, ...prev]);
+    setTotal(t => t + 1);
+    setTabCounts(prev => {
+      const key = customer?.opted_out ? 'inactive' : 'active';
+      return {
+        all:      prev.all + 1,
+        active:   key === 'active'   ? prev.active + 1   : prev.active,
+        inactive: key === 'inactive' ? prev.inactive + 1 : prev.inactive,
+      };
+    });
+    setPendingDelete(null);
   };
 
   const handleUpdated = () => {
@@ -746,6 +797,20 @@ function CustomersPage() {
       {toast && (
         <div className="fixed bottom-20 md:bottom-6 right-4 z-50 alert-success shadow-lg animate-slide-up">
           <span>{'\u2713'}</span><span>{toast}</span>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 z-50 bg-gray-900 text-white rounded-xl shadow-lg px-4 py-3 flex items-center gap-4 animate-slide-up">
+          <span className="text-sm">
+            {'Customer deleted \u2014 '}<span className="font-semibold">{pendingDelete.customer.name}</span>
+          </span>
+          <button
+            onClick={handleUndoDelete}
+            className="text-purple-300 hover:text-purple-200 text-sm font-bold shrink-0"
+          >
+            Undo
+          </button>
         </div>
       )}
 
@@ -795,21 +860,25 @@ function CustomersPage() {
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
               {exportLoading ? '\u2026' : 'Export'}
             </button>
-            <button
-              onClick={() => setShowImport(true)}
-              className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
-            >
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-              Import
-            </button>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#7C3AED' }}
-            >
-              <span className="hidden sm:inline">{'+ Add Customer'}</span>
-              <span className="sm:hidden">{'+ Add'}</span>
-            </button>
+            {!isStaff && (
+              <button
+                onClick={() => setShowImport(true)}
+                className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                Import
+              </button>
+            )}
+            {!isStaff && (
+              <button
+                onClick={() => setShowAdd(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#7C3AED' }}
+              >
+                <span className="hidden sm:inline">{'+ Add Customer'}</span>
+                <span className="sm:hidden">{'+ Add'}</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="flex gap-2 mt-2 sm:hidden">
@@ -821,33 +890,47 @@ function CustomersPage() {
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
             {exportLoading ? '\u2026' : 'Export CSV'}
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
-          >
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-            Import CSV
-          </button>
+          {!isStaff && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+              Import CSV
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="relative mb-4">
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" />
-            <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
-          </svg>
-        </span>
-        <input
-          className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
-          placeholder="Search by name, phone or email..."
-          value={search}
-          onChange={e => handleSearch(e.target.value)} />
-        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M11 14h2" />
-          </svg>
-        </span>
+      <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" />
+              <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+          </span>
+          <input
+            className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
+            placeholder="Search by name, phone or email..."
+            value={search}
+            onChange={e => handleSearch(e.target.value)} />
+          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M11 14h2" />
+            </svg>
+          </span>
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => { setSort(e.target.value); setPage(1); }}
+          className="bg-gray-100 rounded-xl px-3 text-sm text-gray-600 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer shrink-0"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="name_asc">Name A-Z</option>
+          <option value="name_desc">Name Z-A</option>
+        </select>
       </div>
 
       <div className="flex border-b border-gray-200 mb-4">
@@ -905,7 +988,14 @@ function CustomersPage() {
                 {c.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                  {c.tags && c.tags.indexOf('referral') !== -1 && (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 shrink-0">
+                      Referred
+                    </span>
+                  )}
+                </div>
                 {c.phone && <p className="text-[11px] text-gray-400 mt-0.5">{c.phone}</p>}
                 {c.email && <p className="text-[11px] text-gray-400">{c.email}</p>}
               </div>
@@ -915,7 +1005,7 @@ function CustomersPage() {
                     (c.opted_out ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600')}>
                     {c.opted_out ? 'Inactive' : 'Active'}
                   </span>
-                  <span className="text-[10px] text-gray-400">{fmtDate(c.added_at)}</span>
+                  <span className="text-[10px] text-gray-400">{timeAgo(c.added_at)}</span>
                 </div>
                 <button
                   onClick={e => { e.stopPropagation(); setSendTarget(c); }}
@@ -927,33 +1017,37 @@ function CustomersPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                   </svg>
                 </button>
-                <button
-                  onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
-                  title="Delete Customer"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"
-                >
-                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-                <div className="relative">
+                {!isStaff && (
                   <button
-                    onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === c._id ? null : c._id); }}
-                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-xl leading-none pb-0.5"
+                    onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
+                    title="Delete Customer"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"
                   >
-                    {'\u22EE'}
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                   </button>
-                  {menuOpenId === c._id && (
-                    <div className="absolute right-0 top-9 z-30 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-32 overflow-hidden">
-                      <button
-                        onClick={e => { e.stopPropagation(); setEditTarget(c); setMenuOpenId(null); }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
+                )}
+                {!isStaff && (
+                  <div className="relative">
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === c._id ? null : c._id); }}
+                      className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-xl leading-none pb-0.5"
+                    >
+                      {'\u22EE'}
+                    </button>
+                    {menuOpenId === c._id && (
+                      <div className="absolute right-0 top-9 z-30 bg-white rounded-xl shadow-lg border border-gray-100 py-1 w-32 overflow-hidden">
+                        <button
+                          onClick={e => { e.stopPropagation(); setEditTarget(c); setMenuOpenId(null); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))

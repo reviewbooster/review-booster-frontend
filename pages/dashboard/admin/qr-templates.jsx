@@ -6,6 +6,62 @@ import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { useRouter } from 'next/router';
 
+function EditTemplateModal({ template, onClose, onUpdated }) {
+  const [title,       setTitle]       = useState(template.title || '');
+  const [description, setDescription] = useState(template.description || '');
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState('');
+
+  const handleSave = async function() {
+    if (!title.trim()) { setError('Title is required.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const res = await api.patch('/qr-templates/' + template._id, {
+        title: title.trim(),
+        description: description.trim(),
+      });
+      onUpdated(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update template.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-slide-up">
+        <div className="p-6">
+          <h2 className="font-bold text-gray-900 mb-4">Edit Template</h2>
+          <div className="mb-3">
+            <label className="label">Template Title *</label>
+            <input
+              className="input"
+              value={title}
+              onChange={function(e) { setTitle(e.target.value); }}
+            />
+          </div>
+          <div className="mb-4">
+            <label className="label">Description (optional)</label>
+            <input
+              className="input"
+              value={description}
+              onChange={function(e) { setDescription(e.target.value); }}
+            />
+          </div>
+          {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={saving} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 justify-center">
+              {saving ? <><span className="spinner" />{' Saving\u2026'}</> : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function QrTemplatesPage() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -23,6 +79,14 @@ function QrTemplatesPage() {
   const [preview,      setPreview]      = useState(null);
   const [uploading,    setUploading]    = useState(false);
   const [uploadError,  setUploadError]  = useState('');
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [editTarget,   setEditTarget]   = useState(null);
+
+  const filteredTemplates = templates.filter(function(t) {
+    var q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (t.title || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
+  });
 
   useEffect(function() {
     if (user && user.role !== 'super_admin') router.replace('/dashboard');
@@ -104,6 +168,18 @@ function QrTemplatesPage() {
     <>
       <Head><title>QR Templates | ReviewBooster</title></Head>
       <DashboardLayout>
+
+        {editTarget && (
+          <EditTemplateModal
+            template={editTarget}
+            onClose={function() { setEditTarget(null); }}
+            onUpdated={function(updated) {
+              setTemplates(function(prev) { return prev.map(function(t) { return t._id === updated._id ? updated : t; }); });
+              setEditTarget(null);
+              showToast('Template updated!');
+            }}
+          />
+        )}
 
         {toast && (
           <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 alert-success shadow-lg animate-slide-up">
@@ -212,10 +288,25 @@ function QrTemplatesPage() {
 
         {error && <div className="alert-error mb-4"><span>!</span><span>{error}</span></div>}
 
+        <div className="relative mb-4">
+          <input
+            className="input pl-9"
+            placeholder="Search by title or description..."
+            value={searchQuery}
+            onChange={function(e) { setSearchQuery(e.target.value); }}
+          />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" />
+              <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+          </span>
+        </div>
+
         <div className="mb-4">
           <h2 className="text-sm font-bold text-gray-900">
-            {templates.length > 0
-              ? (templates.length + ' Template' + (templates.length !== 1 ? 's' : ''))
+            {filteredTemplates.length > 0
+              ? (filteredTemplates.length + ' Template' + (filteredTemplates.length !== 1 ? 's' : ''))
               : 'Templates'}
           </h2>
         </div>
@@ -226,7 +317,7 @@ function QrTemplatesPage() {
               return <div key={i} className="h-48 bg-white rounded-xl border border-gray-100 animate-pulse" />;
             })}
           </div>
-        ) : templates.length === 0 ? (
+        ) : filteredTemplates.length === 0 ? (
           <div className="card">
             <div className="empty-state">
               <p className="empty-icon">{'\uD83D\uDCF8'}</p>
@@ -236,7 +327,7 @@ function QrTemplatesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {templates.map(function(t) {
+            {filteredTemplates.map(function(t) {
               return (
                 <div key={t._id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group">
                   <div className="relative">
@@ -245,6 +336,15 @@ function QrTemplatesPage() {
                       alt={t.title}
                       className="w-full h-36 object-cover"
                     />
+                    <button
+                      onClick={function() { setEditTarget(t); }}
+                      className="absolute top-2 right-11 w-7 h-7 rounded-lg bg-white/90 hover:bg-white text-gray-600 flex items-center justify-center transition-colors shadow opacity-0 group-hover:opacity-100"
+                    >
+                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </button>
                     <button
                       onClick={function() { setDeleteTarget(t); }}
                       className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow opacity-0 group-hover:opacity-100"

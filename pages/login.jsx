@@ -11,6 +11,102 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 
+// Replace with your real WhatsApp support number, E.164 digits only (no +, no spaces)
+const SUPPORT_WHATSAPP_NUMBER = '919584417319';
+
+const FAQS = [
+  {
+    q: 'I forgot my password. What do I do?',
+    a: 'Click "Forgot password?" below the login form and follow the emailed reset link.',
+  },
+  {
+    q: 'How long does account approval take?',
+    a: 'New business signups are reviewed by our team, usually within 24 hours.',
+  },
+  {
+    q: 'How does the review request flow work?',
+    a: '4-5 star ratings redirect customers to leave a public Google review. 1-3 star ratings go to a private feedback form only you can see.',
+  },
+  {
+    q: 'Is my customer data secure?',
+    a: 'Yes. All data is encrypted in transit, and each business\u2019s data is fully isolated from every other business on the platform.',
+  },
+];
+
+function HelpButton() {
+  const [open, setOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState(null);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-brand-500 hover:bg-brand-600 text-white shadow-lg flex items-center justify-center transition-colors"
+        aria-label="Help"
+      >
+        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" />
+          <circle cx="12" cy="12" r="10" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-6 bg-black/40">
+          <div className="w-full sm:w-80 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h2 className="font-bold text-gray-900 text-sm">Help & Support</h2>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-4">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+                Frequently Asked Questions
+              </p>
+              <div className="space-y-1.5 mb-4">
+                {FAQS.map(function(item, i) {
+                  var isOpen = openFaq === i;
+                  return (
+                    <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaq(isOpen ? null : i)}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 text-left text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="pr-2">{item.q}</span>
+                        <span className="text-gray-300 shrink-0">{isOpen ? '\u2212' : '+'}</span>
+                      </button>
+                      {isOpen && (
+                        <p className="px-3.5 pb-3 text-xs text-gray-500 leading-relaxed">{item.a}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              
+              <a
+                href={'https://wa.me/' + SUPPORT_WHATSAPP_NUMBER + '?text=' + encodeURIComponent('Hi, I need help with ReviewBooster')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                </svg>
+                Chat with us on WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
@@ -62,6 +158,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
+
+      <HelpButton />
 
       {/* Background pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -130,7 +228,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="********"
                   className="w-full px-4 py-3 pr-11 rounded-xl border border-white/10 bg-white/5
                              text-white placeholder-white/25 text-sm
                              focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50

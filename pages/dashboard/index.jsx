@@ -1,8 +1,8 @@
 /**
  * pages/dashboard/index.jsx
- * Dashboard — Phase 2 redesign, mobile + desktop responsive.
- * Session 17 — trend indicators (% vs last month), View All colour fix.
- * Session 18 fix — date filter dropdown (7d / 30d / 3m), rolling period stats + chart.
+ * Dashboard -- Phase 2 redesign, mobile + desktop responsive.
+ * Session 17 -- trend indicators (% vs last month), View All colour fix.
+ * Session 18 fix -- date filter dropdown (7d / 30d / 3m), rolling period stats + chart.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -56,9 +56,10 @@ function calcTrend(current, previous) {
 }
 
 /* --- Mini stat card -------------------------------------------------------- */
-function MiniCard({ icon, iconBg, label, value, trend, trendSuffix }) {
+function MiniCard({ icon, iconBg, label, value, trend, trendSuffix, isTrialCard }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-2 flex flex-col justify-between flex-1 min-h-0">
+    <div className={'bg-white rounded-2xl border shadow-sm p-2 flex flex-col justify-between flex-1 min-h-0 ' +
+      (isTrialCard ? 'border-amber-200' : 'border-gray-100')}>
       <div className="flex items-start justify-between">
         <p className="text-[10px] font-semibold text-gray-400 leading-none">{label}</p>
         <div className={'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs ' + iconBg}>
@@ -66,25 +67,44 @@ function MiniCard({ icon, iconBg, label, value, trend, trendSuffix }) {
         </div>
       </div>
       <p className="text-[22px] font-bold text-gray-900 leading-none tabular-nums text-center">{value}</p>
-      {trend != null ? (
+      {isTrialCard ? (
+        <Link href="/dashboard/settings" className="text-[10px] font-semibold leading-none text-center text-amber-600 hover:text-amber-700">
+          {'Upgrade plan \u2192'}
+        </Link>
+      ) : trend != null ? (
         <p className={'text-[10px] font-semibold leading-none text-center ' + (trend.up ? 'text-emerald-500' : 'text-red-400')}>
           {(trend.up ? '\u2191 +' : '\u2193 -') + trend.pct + '%'}
           <span className="hidden md:inline">{'\u00a0' + trendSuffix}</span>
         </p>
       ) : (
-        <p className="text-[10px] text-gray-300 leading-none text-center">No data</p>
+        <p className="text-[10px] text-gray-300 leading-none text-center">Just getting started</p>
       )}
     </div>
   );
 }
 
-/* --- Average Rating card (purple gradient) --------------------------------- */
+/* --- Average Rating card (color reflects actual rating health) ------------- */
 function AvgCard({ summary, mtd, mobile }) {
-  const cardStyle = { background: 'linear-gradient(145deg,#7C3AED 0%,#4F46E5 100%)' };
-  if (mobile) cardStyle.height = '215px';
-  const avg     = summary && summary.avg_rating ? summary.avg_rating.toFixed(1) : '\u2014';
-  const rounded = Math.round(summary && summary.avg_rating ? summary.avg_rating : 0);
+  const rawAvg = summary && summary.avg_rating ? summary.avg_rating : 0;
+  const hasData = !!(summary && summary.avg_rating);
+  const reviewCount = (summary && summary.total_reviews) ? summary.total_reviews : 0;
+  const MIN_SAMPLE = 5;
+  const notEnoughData = hasData && reviewCount < MIN_SAMPLE;
+  const avg     = hasData ? rawAvg.toFixed(1) : '\u2014';
+  const rounded = Math.round(rawAvg);
   const delta   = mtd ? mtd.total_reviews : 0;
+
+  const gradient = (!hasData || notEnoughData)
+    ? 'linear-gradient(145deg,#7C3AED 0%,#4F46E5 100%)'
+    : rawAvg >= 4
+      ? 'linear-gradient(145deg,#059669 0%,#047857 100%)'
+      : rawAvg >= 3
+        ? 'linear-gradient(145deg,#D97706 0%,#B45309 100%)'
+        : 'linear-gradient(145deg,#DC2626 0%,#B91C1C 100%)';
+
+  const cardStyle = { background: gradient };
+  if (mobile) cardStyle.height = '215px';
+
   return (
     <div className="rounded-2xl p-4 text-white flex flex-col justify-between" style={cardStyle}>
       <div>
@@ -106,6 +126,16 @@ function AvgCard({ summary, mtd, mobile }) {
           ))}
         </div>
       </div>
+      {notEnoughData && (
+        <p style={{ fontSize: '11px', fontWeight: 600, opacity: 0.9 }}>
+          {'Not enough data yet \u2014 ' + reviewCount + ' of ' + MIN_SAMPLE + ' reviews needed'}
+        </p>
+      )}
+      {!notEnoughData && hasData && rawAvg < 3 && (
+        <p style={{ fontSize: '11px', fontWeight: 700, opacity: 0.95 }}>
+          {'\u26A0\uFE0F Needs attention \u2014 check your Feedback tab'}
+        </p>
+      )}
       <p style={{ fontSize: '11px', opacity: 0.65 }}>
         {delta > 0 ? '\u2191 ' + delta + ' this period' : 'No reviews this period'}
       </p>
@@ -174,16 +204,67 @@ function DashboardPage() {
   const { user }                          = useAuth();
   const [selectedDays,  setSelectedDays]  = useState(30);
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
+  const [customDaysInput, setCustomDaysInput] = useState('');
+  const [dateMode,      setDateMode]      = useState('preset'); // 'preset' | 'range'
+  const [rangeStart,    setRangeStart]    = useState('');
+  const [rangeEnd,      setRangeEnd]      = useState('');
+  const [rangeError,    setRangeError]    = useState('');
   const [summary,       setSummary]       = useState(null);
   const [chartData,     setChartData]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [fetching,      setFetching]      = useState(false);
   const [mounted,       setMounted]       = useState(false);
   const [error,         setError]         = useState('');
+  const [needsGoogleUrl, setNeedsGoogleUrl] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState(0);
+  const [businessPlan, setBusinessPlan] = useState(null);
+  const [trialEndsAt, setTrialEndsAt] = useState(null);
+  const [googleBannerDismissed, setGoogleBannerDismissed] = useState(false);
+  const [referralTotal, setReferralTotal] = useState(0);
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
 
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('rb_dismiss_google_banner') === '1') {
+      setGoogleBannerDismissed(true);
+    }
+  }, []);
+
+  // Total verified referrals Ã¢â‚¬â€ quiet, all-time count for the summary card below.
+  useEffect(() => {
+    if (user?.role === 'super_admin') return;
+    api.get('/referrals/stats')
+      .then((res) => setReferralTotal(res.data?.data?.total_redeemed ?? 0))
+      .catch(() => { /* silent */ });
+  }, [user]);
+
+  // Prompt owners to set their Google Review URL if it's still missing --
+  // without it, 4-5 star reviews have nowhere to redirect to.
+  useEffect(() => {
+    if (user?.role === 'super_admin') return;
+    api.get('/business/my-settings')
+      .then((res) => {
+        const url = res.data?.data?.google_review_url;
+        setNeedsGoogleUrl(!url);
+        setBusinessPlan(res.data?.data?.plan ?? null);
+        setTrialEndsAt(res.data?.data?.trial_ends_at ?? null);
+        const createdAt = res.data?.data?.created_at;
+        if (createdAt) {
+          const ageDays = (Date.now() - new Date(createdAt)) / (1000 * 60 * 60 * 24);
+          if (ageDays < 14) setSelectedDays(7);
+        }
+      })
+      .catch(() => { /* silent -- non-critical prompt */ });
+  }, [user]);
+
+  // Unresolved private-feedback count, for the dashboard badge/callout.
+  useEffect(() => {
+    if (user?.role === 'super_admin') return;
+    api.get('/reviews/private?page=1&limit=1')
+      .then((res) => setUnresolvedCount(res.data?.totalUnresolved ?? 0))
+      .catch(() => { /* silent */ });
+  }, [user]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -197,7 +278,7 @@ function DashboardPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, [dropdownOpen]);
 
-  // Fetch data — re-runs when selectedDays changes
+  // Fetch data -- re-runs when selectedDays/dateMode/range changes
   useEffect(() => {
     const isFirst = firstLoadRef.current;
     if (isFirst) {
@@ -210,9 +291,12 @@ function DashboardPage() {
 
     const load = async () => {
       try {
+        const query = dateMode === 'range' && rangeStart && rangeEnd
+          ? 'start_date=' + rangeStart + '&end_date=' + rangeEnd
+          : 'days=' + selectedDays;
         const [sumRes, chartRes] = await Promise.all([
-          api.get('/analytics/summary?days=' + selectedDays),
-          api.get('/analytics/reviews-over-time?days=' + selectedDays),
+          api.get('/analytics/summary?' + query),
+          api.get('/analytics/reviews-over-time?' + query),
         ]);
         setSummary(sumRes.data.data);
         setChartData(chartRes.data.data || []);
@@ -224,27 +308,68 @@ function DashboardPage() {
       }
     };
     load();
-  }, [selectedDays]);
+  }, [selectedDays, dateMode, rangeStart, rangeEnd]);
 
   if (loading) return <DashboardSkeleton />;
+
+  const handleCustomDaysApply = () => {
+    const n = parseInt(customDaysInput, 10);
+    if (n >= 1 && n <= 365) {
+      setDateMode('preset');
+      setSelectedDays(n);
+      setDropdownOpen(false);
+      setCustomDaysInput('');
+    }
+  };
+
+  const handleRangeApply = () => {
+    if (!rangeStart || !rangeEnd) {
+      setRangeError('Pick both a start and end date.');
+      return;
+    }
+    if (rangeStart > rangeEnd) {
+      setRangeError('Start date must be before end date.');
+      return;
+    }
+    setRangeError('');
+    setDateMode('range');
+    setDropdownOpen(false);
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
 
   const total       = summary?.total_requests_sent || 0;
   const calcPct     = (v) => total > 0 ? Math.round(((v || 0) / total) * 100) : 0;
   const mtd         = summary?.this_month ?? null;
   const lmtd        = summary?.last_month ?? null;
-  const trendSuffix = getTrendSuffix(selectedDays);
+  const effectiveDays = dateMode === 'range' && rangeStart && rangeEnd
+    ? Math.max(1, Math.round((new Date(rangeEnd) - new Date(rangeStart)) / 86400000) + 1)
+    : selectedDays;
+  const trendSuffix = dateMode === 'range' ? 'vs previous period' : getTrendSuffix(selectedDays);
 
   // X-axis tick interval: show ~6 labels regardless of period length
-  const chartInterval = selectedDays <= 7 ? 0 : selectedDays <= 30 ? 4 : 13;
+  const chartInterval = effectiveDays <= 7 ? 0 : effectiveDays <= 30 ? 4 : 13;
 
   const funnelRows = [
     { icon: '\u25B8', isGoogle: false, label: 'Requests Sent',    value: total,                          pct: 100,                               color: '#60A5FA' },
-    { icon: '\u25CF', isGoogle: false, label: 'Requestees',       value: summary?.total_requestees ?? 0, pct: calcPct(summary?.total_requestees), color: '#818CF8' },
     { icon: '\u2192', isGoogle: false, label: 'Delivered',        value: summary?.total_delivered  ?? 0, pct: calcPct(summary?.total_delivered),  color: '#2DD4BF' },
     { icon: '\u25CB', isGoogle: false, label: 'Opened',           value: summary?.total_opened     ?? 0, pct: calcPct(summary?.total_opened),     color: '#FBBF24' },
     { icon: '\u2713', isGoogle: false, label: 'Submitted',        value: summary?.total_reviews    ?? 0, pct: calcPct(summary?.total_reviews),    color: '#34D399' },
     { icon: '',       isGoogle: true,  label: 'Posted to Google', value: summary?.total_public     ?? 0, pct: calcPct(summary?.total_public),     color: '#818CF8' },
   ];
+
+  const totalPrivate    = summary?.total_private ?? 0;
+  const totalUnresolved = summary?.total_unresolved ?? 0;
+  const totalResolved   = Math.max(0, totalPrivate - totalUnresolved);
+  const calcFeedbackPct = (v) => totalPrivate > 0 ? Math.round(((v || 0) / totalPrivate) * 100) : 0;
+  const feedbackStatusRows = [
+    { icon: '\u2713', isGoogle: false, label: 'Resolved',   value: totalResolved,   pct: calcFeedbackPct(totalResolved),   color: '#34D399' },
+    { icon: '\u26A0', isGoogle: false, label: 'Unresolved', value: totalUnresolved, pct: calcFeedbackPct(totalUnresolved), color: '#F87171' },
+  ];
+
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24)))
+    : null;
 
   const miniCards = [
     {
@@ -262,13 +387,20 @@ function DashboardPage() {
       trend: calcTrend(mtd?.total_public ?? 0, lmtd?.total_public),
       trendSuffix,
     },
-    {
-      icon: '\uD83D\uDEA9', iconBg: 'bg-red-50',
-      label: 'Private Feedback',
-      value: summary?.total_private ?? 0,
-      trend: calcTrend(mtd?.total_private ?? 0, lmtd?.total_private),
-      trendSuffix,
-    },
+    businessPlan === 'trial' && trialDaysLeft !== null
+      ? {
+          icon: '\u23F3', iconBg: 'bg-amber-50',
+          label: 'Trial Days Left',
+          value: trialDaysLeft,
+          isTrialCard: true,
+        }
+      : {
+          icon: '\uD83D\uDEA9', iconBg: 'bg-red-50',
+          label: 'Private Feedback',
+          value: summary?.total_private ?? 0,
+          trend: calcTrend(mtd?.total_private ?? 0, lmtd?.total_private),
+          trendSuffix,
+        },
   ];
 
   return (
@@ -278,6 +410,48 @@ function DashboardPage() {
           <span>{'\u26A0\uFE0F'}</span>
           <span>{error}</span>
         </div>
+      )}
+
+      {needsGoogleUrl && !googleBannerDismissed && (
+        <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 mb-4">
+          <span className="text-base shrink-0">{'\u26A0\uFE0F'}</span>
+          <p className="flex-1 min-w-0 text-xs font-medium text-amber-700 truncate">
+            {'Add your Google Review link to enable redirects'}
+          </p>
+          <Link
+            href="/dashboard/settings"
+            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+          >
+            Set it up
+          </Link>
+          <button
+            onClick={() => {
+              setGoogleBannerDismissed(true);
+              if (typeof window !== 'undefined') sessionStorage.setItem('rb_dismiss_google_banner', '1');
+            }}
+            className="shrink-0 text-amber-400 hover:text-amber-600 p-1"
+            aria-label="Dismiss"
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {unresolvedCount > 0 && (
+        <Link
+          href="/dashboard/feedback"
+          className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 hover:bg-red-100 transition-colors"
+        >
+          <span className="shrink-0 bg-red-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5">
+            {unresolvedCount > 99 ? '99+' : unresolvedCount}
+          </span>
+          <p className="text-sm font-semibold text-red-600 flex-1">
+            {unresolvedCount === 1 ? '1 piece of feedback needs your attention' : unresolvedCount + ' pieces of feedback need your attention'}
+          </p>
+          <span className="text-red-400 text-xs font-semibold shrink-0">View {'\u2192'}</span>
+        </Link>
       )}
 
       {/* Greeting + date filter */}
@@ -296,29 +470,89 @@ function DashboardPage() {
             className={'inline-flex items-center gap-1.5 bg-white border rounded-xl px-3 py-1.5 text-[11px] font-medium shadow-sm transition-colors ' +
               (dropdownOpen ? 'border-purple-400 text-purple-600' : 'border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600')}
           >
-            {'\uD83D\uDCC5\u00a0' + getDateRangeLabel(selectedDays) + '\u00a0\u25BE'}
+            {'\uD83D\uDCC5\u00a0' +
+              (dateMode === 'range' && rangeStart && rangeEnd
+                ? new Date(rangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '\u00a0\u2013\u00a0' + new Date(rangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : getDateRangeLabel(selectedDays)) +
+              '\u00a0\u25BE'}
           </button>
           {dropdownOpen && (
             <div
               className="absolute left-0 top-full mt-1.5 bg-white rounded-xl border border-gray-100 shadow-lg z-50 overflow-hidden"
-              style={{ minWidth: '156px' }}
+              style={{ minWidth: '220px' }}
             >
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-4 pt-3 pb-1">Quick ranges</p>
               {PERIOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.days}
-                  onClick={() => { setSelectedDays(opt.days); setDropdownOpen(false); }}
+                  onClick={() => { setDateMode('preset'); setSelectedDays(opt.days); setDropdownOpen(false); }}
                   className={'w-full text-left px-4 py-2.5 text-[12px] font-medium transition-colors ' +
-                    (selectedDays === opt.days ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50')}
+                    (dateMode === 'preset' && selectedDays === opt.days ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50')}
                 >
                   {opt.label}
                 </button>
               ))}
+              <div className="border-t border-gray-100 px-4 py-2.5">
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1.5">Custom (days)</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    placeholder="e.g. 4"
+                    value={customDaysInput}
+                    onChange={(e) => setCustomDaysInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCustomDaysApply(); }}
+                    className="w-full bg-gray-100 rounded-lg px-2.5 py-1.5 text-[12px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0"
+                  />
+                  <button
+                    onClick={handleCustomDaysApply}
+                    className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold px-3 rounded-lg transition-colors"
+                  >
+                    Go
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-2">Custom date range</label>
+                {rangeError && <p className="text-[10px] text-red-500 mb-1.5">{rangeError}</p>}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] text-gray-400 block mb-0.5">From</span>
+                    <input
+                      type="date"
+                      value={rangeStart}
+                      max={rangeEnd || today}
+                      onChange={(e) => { setRangeStart(e.target.value); setRangeError(''); }}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0"
+                    />
+                  </div>
+                  <span className="text-gray-300 text-xs mt-3">{'\u2192'}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[9px] text-gray-400 block mb-0.5">To</span>
+                    <input
+                      type="date"
+                      value={rangeEnd}
+                      min={rangeStart}
+                      max={today}
+                      onChange={(e) => { setRangeEnd(e.target.value); setRangeError(''); }}
+                      className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 min-w-0"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleRangeApply}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold py-2 rounded-lg transition-colors"
+                >
+                  Apply Range
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Data sections — fade during period re-fetch */}
+      {/* Data sections -- fade during period re-fetch */}
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
         {/* Mobile: avg card + 3 mini cards */}
@@ -334,6 +568,25 @@ function DashboardPage() {
           <AvgCard summary={summary} mtd={mtd} />
           {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
         </div>
+
+        {/* Referral program Ã¢â‚¬â€ total verified referrals, all-time */}
+        <Link
+          href="/dashboard/referrals"
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5 flex items-center gap-3 hover:border-purple-200 transition-colors"
+        >
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#F3E8FF' }}>
+            <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 4v-2a4 4 0 00-3-3.87M9 12a4 4 0 100-8 4 4 0 000 8z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{referralTotal}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {'Customer' + (referralTotal === 1 ? '' : 's') + ' referred by your reviewers'}
+            </p>
+          </div>
+          <span className="ml-auto text-[11px] font-semibold text-purple-600 shrink-0">View Referrals {'\u2192'}</span>
+        </Link>
 
         {/* Funnel + Chart */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -359,6 +612,34 @@ function DashboardPage() {
                 />
               ))}
             </div>
+            {totalPrivate > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-50">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Private Feedback Status</h3>
+                  <Link href="/dashboard/feedback" className="text-[11px] font-semibold text-purple-600 hover:underline">
+                    View all
+                  </Link>
+                </div>
+                <div className="space-y-3.5">
+                  {feedbackStatusRows.map((row) => (
+                    <FunnelRow
+                      key={row.label}
+                      icon={row.icon}
+                      isGoogle={row.isGoogle}
+                      label={row.label}
+                      value={row.value}
+                      pct={row.pct}
+                      color={row.color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {(summary?.total_private ?? 0) > 0 && (summary?.total_public ?? 0) === 0 && (
+              <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-50">
+                {summary.total_private + ' review' + (summary.total_private === 1 ? '' : 's') + ' went to private feedback instead of Google \u2014 nothing\'s broken, that\'s expected for low ratings.'}
+              </p>
+            )}
           </div>
 
           {/* Reviews Over Time */}
