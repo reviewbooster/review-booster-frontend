@@ -874,6 +874,13 @@ function AdminPage() {
   const [activateTarget,      setActivateTarget]      = useState(null);
   const [showBillingSettings, setShowBillingSettings] = useState(false);
   const [showBusinessReferrals, setShowBusinessReferrals] = useState(false);
+
+  // Sidebar links to /dashboard/admin?modal=billing or ?modal=referrals
+  // to open these without a separate page for each.
+  useEffect(function() {
+    if (router.query.modal === 'billing') setShowBillingSettings(true);
+    if (router.query.modal === 'referrals') setShowBusinessReferrals(true);
+  }, [router.query.modal]);
   const [stats, setStats] = useState(null);
 
   useEffect(function() {
@@ -982,9 +989,6 @@ function AdminPage() {
           <p className="page-subtitle">{businesses.length} business{businesses.length !== 1 ? "es" : ""} registered</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => setShowBillingSettings(true)} className="btn-secondary">Billing Settings</button>
-          <button onClick={() => setShowBusinessReferrals(true)} className="btn-secondary">Business Referrals</button>
-          <a href="/dashboard/admin/audit-log" className="btn-secondary">Audit Log</a>
           <button onClick={() => setShowCreate(true)} className="btn-primary">+ Create Business</button>
         </div>
       </div>
