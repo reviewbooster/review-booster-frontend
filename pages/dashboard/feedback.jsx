@@ -1,11 +1,11 @@
 /**
  * pages/dashboard/feedback.jsx
- * Private Feedback page — Phase 2 redesign.
- * Session 17 — urgency badges.
- * Session 19 — overflow fix, inline Resolve icon, removed three-dot.
- * Session 19b — modal: customer details, reply textarea, copy-to-clipboard.
- * Session 19c — more prominent buttons on cards and in modal.
- * Later fix — real search/filter/sort (funnel icon used to be decorative),
+ * Private Feedback page ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Phase 2 redesign.
+ * Session 17 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â urgency badges.
+ * Session 19 ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â overflow fix, inline Resolve icon, removed three-dot.
+ * Session 19b ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â modal: customer details, reply textarea, copy-to-clipboard.
+ * Session 19c ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â more prominent buttons on cards and in modal.
+ * Later fix ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â real search/filter/sort (funnel icon used to be decorative),
  * and a resolution trail (who resolved it, and when) on resolved items.
  */
 
@@ -29,9 +29,16 @@ function sourceLabel(src) {
 
 function getStatus(r) {
   if (r.status === 'resolved' || r.resolved === true) return 'Resolved';
-  if (r.status === 'in_progress') return 'In Progress';
+  if (r.stage === 'processing') return 'Processing';
+  if (r.stage === 'awaiting_confirmation') return 'Awaiting Confirmation';
   return 'New';
 }
+
+var STAGE_OPTIONS = [
+  { key: 'new',                   label: 'New' },
+  { key: 'processing',            label: 'Processing' },
+  { key: 'awaiting_confirmation', label: 'Awaiting Confirmation' },
+];
 
 function daysToRange(days) {
   var end = new Date();
@@ -63,9 +70,10 @@ var SORT_OPTIONS = [
 
 function StatusBadge({ status }) {
   var styles = {
-    'New':         'bg-orange-50 text-orange-500',
-    'In Progress': 'bg-blue-50 text-blue-500',
-    'Resolved':    'bg-green-50 text-green-600',
+    'New':                   'bg-orange-50 text-orange-500',
+    'Processing':            'bg-blue-50 text-blue-500',
+    'Awaiting Confirmation': 'bg-purple-50 text-purple-500',
+    'Resolved':              'bg-green-50 text-green-600',
   };
   return (
     <span className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (styles[status] || 'bg-gray-100 text-gray-400')}>
@@ -141,7 +149,7 @@ function buildPages(page, total) {
 }
 
 // -- Detail / Reply modal -----------------------------------------------------
-function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
+function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onStageChange })  {
   const [reply,  setReply]  = useState('');
   const [copied, setCopied] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -149,6 +157,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
   const [resolvedBy, setResolvedBy] = useState(null);
+  const [updatingStage, setUpdatingStage] = useState(false);
 
   var status       = getStatus(item);
   var customer     = (item.customer_id && typeof item.customer_id === 'object') ? item.customer_id : null;
@@ -175,7 +184,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
     if (!customer) return;
     setResending(true);
     setResendMsg('');
-    api.post('/requests', { customer_id: customer._id, channel: item.source })
+    api.post('/requests', { customer_id: customer._id, channel: customer.phone ? 'whatsapp' : 'email' })
       .then(function() { setResendMsg('New review request sent!'); })
       .catch(function(err) { setResendMsg(err.response?.data?.error || 'Failed to resend.'); })
       .finally(function() { setResending(false); });
@@ -272,7 +281,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
                   onClick={handleSuggestReply}
                   disabled={suggesting}
                   className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-50 flex items-center gap-1">
-                  {suggesting ? <><span className="spinner" /> Generating…</> : <>{'\u2736'} Suggest Reply</>}
+                  {suggesting ? <><span className="spinner" /> GeneratingÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦</> : <>{'\u2736'} Suggest Reply</>}
                 </button>
               )}
             </div>
@@ -318,6 +327,29 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff }) {
                 : 'No contact info on file \u2014 copy and send manually.'}
             </p>
           </div>
+
+          {status !== 'Resolved' && (
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-gray-500 mb-1.5">Stage</p>
+              <div className="flex gap-1.5">
+                {STAGE_OPTIONS.map(function(s) {
+                  var isCurrent = (item.stage || 'new') === s.key;
+                  return (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={function() { onStageChange && onStageChange(item._id, s.key); }}
+                      disabled={updatingStage}
+                      className={'flex-1 text-[10px] font-semibold py-2 px-1 rounded-lg transition-colors ' +
+                        (isCurrent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Resolve + Close */}
           {status !== 'Resolved' && onResolve && (
@@ -485,6 +517,20 @@ function FeedbackPage() {
     setPage(1);
   };
 
+  var handleStageChange = async function(id, stage) {
+    try {
+      await api.patch('/reviews/' + id + '/stage', { stage: stage });
+      setItems(function(prev) {
+        return prev.map(function(r) { return r._id === id ? Object.assign({}, r, { stage: stage }) : r; });
+      });
+      setViewItem(function(prev) {
+        return prev && prev._id === id ? Object.assign({}, prev, { stage: stage }) : prev;
+      });
+    } catch (e) {
+      // best-effort Ã¢â‚¬â€ stage is a soft progress indicator, not worth blocking the UI over
+    }
+  };
+
   var markResolved = async function(id, resolvedBy) {
     setResolving(id);
     try {
@@ -523,7 +569,8 @@ function FeedbackPage() {
           onClose={function() { setViewItem(null); }}
           onResolve={markResolved}
           resolving={resolving}
-          isStaff={isStaff} />
+          isStaff={isStaff}
+          onStageChange={handleStageChange} />
       )}
 
       {/* Tab bar */}
@@ -699,7 +746,7 @@ function FeedbackPage() {
 
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
-      {/* List — no overflow-hidden so nothing clips */}
+      {/* List ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â no overflow-hidden so nothing clips */}
       <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 transition-opacity duration-150 ' +
         (fetching ? 'opacity-50 pointer-events-none' : '')}>
         {loading ? (
@@ -768,11 +815,11 @@ function FeedbackPage() {
                   )}
 
                   {/* Date + action buttons row */}
-                  <div className="flex items-center justify-between mt-3 gap-2">
+                  <div className="flex flex-col gap-2 mt-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-[10px] text-gray-400 shrink-0">
                       {fmtDate(r.created_at) + ' \u00b7 via ' + sourceLabel(r.source)}
                     </p>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                       {r.customer_id && r.customer_id.phone && (
                         <a
                           href={'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent('Hi ' + r.customer_id.name + ', thank you for your feedback \u2014 we would love the chance to make things right. Can we call you?')}

@@ -36,6 +36,69 @@ const FAQS = [
 function HelpButton() {
   const [open, setOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState(null);
+  const [token, setToken] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [chatStatus, setChatStatus] = useState('open');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [input, setInput] = useState('');
+  const [starting, setStarting] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(function() {
+    if (typeof window === 'undefined') return;
+    var saved = localStorage.getItem('rb_support_chat_token');
+    if (saved) setToken(saved);
+  }, []);
+
+  var refreshChat = function(t) {
+    api.get('/support-chat/' + t)
+      .then(function(res) {
+        setMessages(res.data?.data?.messages || []);
+        setChatStatus(res.data?.data?.status || 'open');
+      })
+      .catch(function() {});
+  };
+
+  useEffect(function() {
+    if (!open || !token) return;
+    refreshChat(token);
+    var interval = setInterval(function() { refreshChat(token); }, 20000);
+    return function() { clearInterval(interval); };
+  }, [open, token]);
+
+  var handleStartChat = function(e) {
+    e.preventDefault();
+    setFormError('');
+    if (!name.trim())  { setFormError('Please enter your name.'); return; }
+    if (!email.trim()) { setFormError('Please enter your email.'); return; }
+    if (!input.trim()) { setFormError('Please enter a message.'); return; }
+    setStarting(true);
+    api.post('/support-chat/start', { name: name.trim(), email: email.trim(), message: input.trim() })
+      .then(function(res) {
+        var t = res.data?.data?.token;
+        setToken(t);
+        setMessages(res.data?.data?.messages || []);
+        if (typeof window !== 'undefined') localStorage.setItem('rb_support_chat_token', t);
+        setInput('');
+      })
+      .catch(function(err) { setFormError(err.response?.data?.error || 'Could not start chat. Please try again.'); })
+      .finally(function() { setStarting(false); });
+  };
+
+  var handleSendMessage = function(e) {
+    e.preventDefault();
+    if (!input.trim() || !token) return;
+    setSending(true);
+    api.post('/support-chat/' + token + '/messages', { message: input.trim() })
+      .then(function(res) {
+        setMessages(res.data?.data?.messages || []);
+        setInput('');
+      })
+      .catch(function() {})
+      .finally(function() { setSending(false); });
+  };
 
   return (
     <>
@@ -53,8 +116,8 @@ function HelpButton() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-6 bg-black/40">
-          <div className="w-full sm:w-80 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="w-full sm:w-80 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
               <h2 className="font-bold text-gray-900 text-sm">Help & Support</h2>
               <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -63,7 +126,7 @@ function HelpButton() {
               </button>
             </div>
 
-            <div className="p-4">
+            <div className="p-4 overflow-y-auto flex-1">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
                 Frequently Asked Questions
               </p>
@@ -88,17 +151,73 @@ function HelpButton() {
                 })}
               </div>
 
-              
-              <a
-                href={'https://wa.me/' + SUPPORT_WHATSAPP_NUMBER + '?text=' + encodeURIComponent('Hi, I need help with ReviewBooster')}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                </svg>
-                Chat with us on WhatsApp
-              </a>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 px-1">
+                Chat with us
+              </p>
+
+              {!token ? (
+                <form onSubmit={handleStartChat} className="space-y-2">
+                  {formError && <p className="text-xs text-red-500">{formError}</p>}
+                  <input
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <input
+                    type="email"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200"
+                    placeholder="Your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <textarea
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200 resize-none"
+                    rows={3}
+                    placeholder="How can we help?"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={starting}
+                    className="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {starting ? 'Starting...' : 'Start Chat'}
+                  </button>
+                </form>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {messages.map(function(m, i) {
+                      var isAdmin = m.sender === 'admin';
+                      return (
+                        <div key={i} className={'flex ' + (isAdmin ? 'justify-start' : 'justify-end')}>
+                          <p className={'text-xs rounded-xl px-3 py-2 max-w-[85%] ' +
+                            (isAdmin ? 'bg-gray-100 text-gray-700' : 'bg-brand-500 text-white')}>
+                            {m.text}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <form onSubmit={handleSendMessage} className="flex gap-2 mt-1">
+                    <input
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-200"
+                      placeholder="Type a message..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !input.trim()}
+                      className="shrink-0 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                    >
+                      Send
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -159,6 +278,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
 
+      <style jsx>{`
+        .login-password-input:-webkit-autofill,
+        .login-password-input:-webkit-autofill:hover,
+        .login-password-input:-webkit-autofill:focus {
+          -webkit-text-fill-color: #fff;
+          -webkit-box-shadow: 0 0 0px 1000px rgba(255,255,255,0.06) inset;
+          transition: background-color 9999s ease-in-out 0s;
+        }
+      `}</style>
+
       <HelpButton />
 
       {/* Background pattern */}
@@ -184,15 +313,13 @@ export default function LoginPage() {
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
 
           {router.query.reason === 'suspended' && !error && (
-            <div className="mb-5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20
-                            text-red-400 text-sm flex items-start gap-2">
+            <div className="mb-5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
               <span className="mt-0.5 shrink-0">{"\u26A0"}</span>
               <span>Account suspended. Please contact your administrator.</span>
             </div>
           )}
           {error && (
-            <div className="mb-5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20
-                            text-red-400 text-sm flex items-start gap-2">
+            <div className="mb-5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
               <span className="mt-0.5 shrink-0">{"\u26A0"}</span>
               <span>{error}</span>
             </div>
@@ -210,10 +337,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@gmail.com"
-                className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5
-                           text-white placeholder-white/25 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50
-                           transition-colors duration-150"
+className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
               />
             </div>
 
@@ -229,17 +353,13 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="********"
-                  className="w-full px-4 py-3 pr-11 rounded-xl border border-white/10 bg-white/5
-                             text-white placeholder-white/25 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50
-                             transition-colors duration-150"
+className="login-password-input w-full px-4 py-3 pr-11 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(function(v) { return !v; })}
                   aria-label="Toggle password visibility"
-                  className="absolute inset-y-0 right-0 flex items-center px-3.5
-                             text-white/30 hover:text-white/70 transition-colors duration-150">
+className="absolute inset-y-0 right-0 flex items-center px-3.5 text-white/30 hover:text-white/70 transition-colors duration-150">
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24"
                       stroke="currentColor" strokeWidth={1.8}>
@@ -273,9 +393,7 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-white/20 bg-white/5
-                             text-brand-500 focus:ring-brand-500/30
-                             focus:ring-offset-0 cursor-pointer"
+className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 text-brand-500 focus:ring-brand-500/30 focus:ring-offset-0 cursor-pointer"
                 />
                 <span className="text-xs text-white/40 group-hover:text-white/60 transition-colors">
                   Remember me
@@ -290,10 +408,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-brand-500 text-white font-bold text-sm
-                         hover:bg-brand-600 active:scale-[0.98]
-                         transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
-                         flex items-center justify-center gap-2">
+className="w-full py-3 rounded-xl bg-brand-500 text-white font-bold text-sm hover:bg-brand-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {loading ? (
                 <>
                   <span className="spinner w-4 h-4" />

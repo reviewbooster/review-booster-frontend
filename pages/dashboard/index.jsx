@@ -58,10 +58,10 @@ function calcTrend(current, previous) {
 /* --- Mini stat card -------------------------------------------------------- */
 function MiniCard({ icon, iconBg, label, value, trend, trendSuffix, isTrialCard }) {
   return (
-    <div className={'bg-white rounded-2xl border shadow-sm p-2 flex flex-col justify-between flex-1 min-h-0 ' +
+    <div className={'bg-white rounded-2xl border shadow-sm p-2 flex flex-col justify-between flex-1 min-h-0 overflow-hidden ' +
       (isTrialCard ? 'border-amber-200' : 'border-gray-100')}>
-      <div className="flex items-start justify-between">
-        <p className="text-[10px] font-semibold text-gray-400 leading-none">{label}</p>
+      <div className="flex items-start justify-between gap-1">
+        <p className="text-[10px] font-semibold text-gray-400 leading-tight truncate">{label}</p>
         <div className={'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs ' + iconBg}>
           {icon}
         </div>
@@ -103,7 +103,7 @@ function AvgCard({ summary, mtd, mobile }) {
         : 'linear-gradient(145deg,#DC2626 0%,#B91C1C 100%)';
 
   const cardStyle = { background: gradient };
-  if (mobile) cardStyle.height = '215px';
+  if (mobile) cardStyle.height = '250px';
 
   return (
     <div className="rounded-2xl p-4 text-white flex flex-col justify-between" style={cardStyle}>
@@ -180,7 +180,7 @@ function DashboardSkeleton() {
       </div>
       <div className="md:hidden grid grid-cols-2 gap-2.5 mb-5">
         <div className="bg-gray-200 rounded-2xl animate-pulse" style={{ height: '215px' }} />
-        <div className="flex flex-col gap-2 h-[215px]">
+        <div className="flex flex-col gap-2 h-[250px]">
           <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
           <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
           <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
@@ -231,7 +231,7 @@ function DashboardPage() {
     }
   }, []);
 
-  // Total verified referrals Ã¢â‚¬â€ quiet, all-time count for the summary card below.
+  // Total verified referrals ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â quiet, all-time count for the summary card below.
   useEffect(() => {
     if (user?.role === 'super_admin') return;
     api.get('/referrals/stats')
@@ -558,7 +558,7 @@ function DashboardPage() {
         {/* Mobile: avg card + 3 mini cards */}
         <div className="md:hidden grid grid-cols-2 gap-2.5 mb-5">
           <AvgCard summary={summary} mtd={mtd} mobile />
-          <div className="flex flex-col gap-2 h-[215px]">
+          <div className="flex flex-col gap-2 h-[250px]">
             {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
           </div>
         </div>
@@ -569,7 +569,7 @@ function DashboardPage() {
           {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
         </div>
 
-        {/* Referral program Ã¢â‚¬â€ total verified referrals, all-time */}
+        {/* Referral program ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â total verified referrals, all-time */}
         <Link
           href="/dashboard/referrals"
           className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5 flex items-center gap-3 hover:border-purple-200 transition-colors"

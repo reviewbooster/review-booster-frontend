@@ -14,7 +14,7 @@ export default function AiReplyModal({ review, onClose }) {
     setCopied(false);
     api.post('/reviews/' + review._id + '/generate-reply')
       .then(function(res) { setDraft(res.data?.data?.draft || ''); })
-      .catch(function() { setError('Could not generate a reply right now. Please try again.'); })
+      .catch(function(err) { setError(err.response?.data?.error || 'Could not generate a reply right now. Please try again.'); })
       .finally(function() { setLoading(false); });
   }, [review]);
 

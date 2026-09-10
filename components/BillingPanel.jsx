@@ -264,23 +264,23 @@ export default function BillingPanel() {
                 return (
                   <div
                     key={plan.slug}
-                    className={'bg-white rounded-2xl border p-6 flex flex-col ' +
+                    className={'bg-white rounded-2xl border p-4 md:p-6 flex flex-col ' +
                       (isCurrent ? 'border-purple-300 ring-2 ring-purple-100' : 'border-gray-100')}
                   >
                     {isCurrent && (
                       <span className="badge badge-blue self-start mb-3">Current Plan</span>
                     )}
-                    <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-                    <p className="text-2xl font-bold text-gray-900 mt-2 mb-1">
+                    <h3 className="text-base md:text-lg font-bold text-gray-900">{plan.name}</h3>
+                    <p className="text-xl md:text-2xl font-bold text-gray-900 mt-1.5 md:mt-2 mb-1">
                       {plan.price_monthly > 0 ? '\u20B9' + plan.price_monthly : 'Contact us'}
                       {plan.price_monthly > 0 && <span className="text-sm font-normal text-gray-400">/mo</span>}
                     </p>
-                    <ul className="space-y-2 my-4 flex-1">
+                    <ul className="space-y-1.5 md:space-y-2 my-3 md:my-4 flex-1">
                       {(plan.features || []).length === 0 ? (
                         <li className="text-xs text-gray-400">No features listed yet.</li>
                       ) : plan.features.map(function(f, i) {
                         return (
-                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                          <li key={i} className="flex items-start gap-2 text-xs md:text-sm text-gray-600">
                             <span className="text-green-500 mt-0.5">{'\u2713'}</span>
                             <span>{f}</span>
                           </li>

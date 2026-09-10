@@ -1,6 +1,6 @@
 /**
  * pages/dashboard/customers.jsx
- * Customers page — Phase 2 + CSV import (S16) + Edit customer + details nav (S17).
+ * Customers page ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Phase 2 + CSV import (S16) + Edit customer + details nav (S17).
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -212,7 +212,7 @@ function EditCustomerModal({ customer, onClose, onUpdated }) {
 
 // -- Delete Confirm Modal ------------------------------------------------------
 function DeleteConfirmModal({ customer, onClose, onDeleted }) {
-  // The actual API delete is delayed by the parent (undo window) — this modal
+  // The actual API delete is delayed by the parent (undo window) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this modal
   // just confirms intent and hands the customer back immediately.
   const handleDelete = () => {
     onDeleted(customer);
@@ -658,6 +658,7 @@ function CustomersPage() {
   const [search,       setSearch]       = useState('');
   const [activeTab,    setActiveTab]    = useState('all');
   const [sort,         setSort]         = useState('newest');
+  const [sortMenuOpen,  setSortMenuOpen]  = useState(false);
   const [tabCounts,    setTabCounts]    = useState({ all: 0, active: 0, inactive: 0 });
   const [countsReady,  setCountsReady]  = useState(false);
   const [loading,      setLoading]      = useState(true);
@@ -679,14 +680,15 @@ function CustomersPage() {
   const [menuOpenId,   setMenuOpenId]   = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
 
-  var handleExportCustomers = async function() {
+  var handleExportCustomers = async function(format) {
+    var fmt = format || 'csv';
     setExportLoading(true);
     try {
-      var res = await api.get('/customers/export', { responseType: 'blob' });
+      var res = await api.get('/customers/export?format=' + fmt, { responseType: 'blob' });
       var url = URL.createObjectURL(res.data);
       var a = document.createElement('a');
       a.href = url;
-      a.download = 'customers-export.csv';
+      a.download = 'customers-export.' + fmt;
       a.click();
       URL.revokeObjectURL(url);
     } catch (_) {}
@@ -853,12 +855,19 @@ function CustomersPage() {
           <h1 className="text-xl font-bold text-gray-900">Customers</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handleExportCustomers()}
+              onClick={() => handleExportCustomers('csv')}
               disabled={exportLoading}
               className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
             >
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
               {exportLoading ? '\u2026' : 'Export'}
+            </button>
+            <button
+              onClick={() => handleExportCustomers('pdf')}
+              disabled={exportLoading}
+              className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
+            >
+              PDF
             </button>
             {!isStaff && (
               <button
@@ -883,12 +892,19 @@ function CustomersPage() {
         </div>
         <div className="flex gap-2 mt-2 sm:hidden">
           <button
-            onClick={() => handleExportCustomers()}
+            onClick={() => handleExportCustomers('csv')}
             disabled={exportLoading}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
           >
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
             {exportLoading ? '\u2026' : 'Export CSV'}
+          </button>
+          <button
+            onClick={() => handleExportCustomers('pdf')}
+            disabled={exportLoading}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
+          >
+            PDF
           </button>
           {!isStaff && (
             <button
@@ -915,22 +931,42 @@ function CustomersPage() {
             placeholder="Search by name, phone or email..."
             value={search}
             onChange={e => handleSearch(e.target.value)} />
-          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <button
+            type="button"
+            onClick={() => setSortMenuOpen(function(v) { return !v; })}
+            aria-label="Sort customers"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-colors p-1"
+          >
             <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M11 14h2" />
             </svg>
-          </span>
+          </button>
+          {sortMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setSortMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-20">
+                {[
+                  { key: 'newest',    label: 'Newest first' },
+                  { key: 'oldest',    label: 'Oldest first' },
+                  { key: 'name_asc',  label: 'Name A-Z' },
+                  { key: 'name_desc', label: 'Name Z-A' },
+                ].map(function(opt) {
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => { setSort(opt.key); setPage(1); setSortMenuOpen(false); }}
+                      className={'w-full text-left px-4 py-2.5 text-sm transition-colors ' +
+                        (sort === opt.key ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value); setPage(1); }}
-          className="bg-gray-100 rounded-xl px-3 text-sm text-gray-600 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer shrink-0"
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="name_asc">Name A-Z</option>
-          <option value="name_desc">Name Z-A</option>
-        </select>
       </div>
 
       <div className="flex border-b border-gray-200 mb-4">

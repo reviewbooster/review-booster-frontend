@@ -1,7 +1,7 @@
 /**
  * pages/dashboard/reviews.jsx
- * Reviews page — Phase 2 redesign.
- * Later fix — the date filter used to be decorative only (always showed "last 7
+ * Reviews page â€” Phase 2 redesign.
+ * Later fix â€” the date filter used to be decorative only (always showed "last 7
  * days" but never actually filtered anything). It's now a real calendar-based
  * range picker, the sort button (search bar icon) actually works, header stats
  * respect all active filters, and channel filtering no longer breaks pagination.
@@ -199,6 +199,7 @@ function ReviewsPage() {
   const [selectedIdx,    setSelectedIdx]    = useState(0);
   const [aiReplyReview,  setAiReplyReview]  = useState(null);
   const [exportLoading,  setExportLoading]  = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [referringId,    setReferringId]    = useState(null);
 
   const dateDropdownRef = useRef(null);
@@ -242,7 +243,7 @@ function ReviewsPage() {
     return function() { document.removeEventListener('mousedown', handler); };
   }, []);
 
-  // Stats strip — now respects rating/channel/date filters (previously always all-time)
+  // Stats strip â€” now respects rating/channel/date filters (previously always all-time)
   useEffect(function() {
     var params = buildFilterParams();
     if (!params.has('start_date')) params.set('days', '36500'); // effectively "all time" for the summary endpoint
@@ -314,15 +315,16 @@ function ReviewsPage() {
     setPage(1);
   };
 
-  var handleExport = async function() {
+  var handleExport = async function(format) {
     setExportLoading(true);
     try {
       var params = buildFilterParams();
+      params.set('format', format);
       var res = await api.get('/reviews/export?' + params.toString(), { responseType: 'blob' });
       var url = URL.createObjectURL(res.data);
       var a = document.createElement('a');
       a.href = url;
-      a.download = 'reviews-export.csv';
+      a.download = 'reviews-export.' + format;
       a.click();
       URL.revokeObjectURL(url);
     } catch (_) {}
@@ -473,12 +475,31 @@ function ReviewsPage() {
             {'\u2715'} Clear
           </button>
         )}
-        <button
-          onClick={handleExport}
-          disabled={exportLoading}
-          className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-[11px] text-gray-600 font-medium hover:border-purple-300 hover:text-purple-600 transition-colors ml-auto disabled:opacity-50">
-          {exportLoading ? '\u2026' : '\u2B07 Export CSV'}
-        </button>
+        <div className="relative ml-auto">
+          <button
+            onClick={function() { setExportMenuOpen(function(v) { return !v; }); }}
+            disabled={exportLoading}
+            className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2 text-[11px] text-gray-600 font-medium hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50">
+            {exportLoading ? '\u2026' : '\u2B07 Export'}
+          </button>
+          {exportMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={function() { setExportMenuOpen(false); }} />
+              <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-20">
+                <button
+                  onClick={function() { setExportMenuOpen(false); handleExport('csv'); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  CSV
+                </button>
+                <button
+                  onClick={function() { setExportMenuOpen(false); handleExport('pdf'); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  PDF
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Search + sort */}
