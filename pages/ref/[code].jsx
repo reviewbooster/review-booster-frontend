@@ -1,9 +1,9 @@
 /**
  * pages/ref/[code].jsx
  *
- * PUBLIC — no auth required.
+ * PUBLIC ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no auth required.
  * A customer's personal referral link. Read-only: shows the business,
- * the offer, and the code to show in person. Nothing is submitted here —
+ * the offer, and the code to show in person. Nothing is submitted here ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
  * attribution happens later when staff verify the code at checkout.
  */
 import { useEffect, useState } from 'react';
@@ -35,6 +35,21 @@ export default function ReferralLanding() {
   const [screen, setScreen]     = useState(SCREEN.LOADING);
   const [referral, setReferral] = useState(null);
   const [copied, setCopied]     = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+
+  // A visits their own link via the WhatsApp Thank+Refer message, which
+  // tags it ?owner=1 the first time. We remember that in this browser so
+  // only A (not friends they share the link with) sees the status section
+  // below \u2014 there is no customer login to check this properly otherwise.
+  useEffect(function() {
+    if (!router.isReady || !code) return;
+    var storageKey = 'rb_referral_owner_' + code;
+    if (router.query.owner === '1') {
+      localStorage.setItem(storageKey, '1');
+      router.replace('/ref/' + code, undefined, { shallow: true });
+    }
+    setIsOwner(localStorage.getItem(storageKey) === '1');
+  }, [router.isReady, code, router.query.owner]);
 
   useEffect(() => {
     if (!code) return;
@@ -129,6 +144,31 @@ export default function ReferralLanding() {
                 </button>
                 {copied && <p className="text-[11px] text-green-600 font-semibold mt-2">{'\u2713'} Copied</p>}
               </div>
+
+              {isOwner && referral.referral_status && (
+                <div className="rounded-2xl p-4 mb-5" style={{ backgroundColor: '#F9FAFB', border: '1px solid #F3F4F6' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-2 text-center text-gray-400">
+                    Your Referral Status
+                  </p>
+                  <p className="text-center text-sm font-semibold text-gray-900 mb-1">
+                    {referral.referral_status.redeemed_count + ' friend' + (referral.referral_status.redeemed_count === 1 ? '' : 's') + ' referred so far'}
+                  </p>
+                  {referral.referral_status.rewards_pending > 0 ? (
+                    <p className="text-center text-xs text-green-600 font-semibold">
+                      {'\uD83C\uDF89 You have ' + referral.referral_status.rewards_pending + ' reward' + (referral.referral_status.rewards_pending === 1 ? '' : 's') + ' ready \u2014 ask us about it on your next visit!'}
+                    </p>
+                  ) : (
+                    <p className="text-center text-xs text-gray-500">
+                      {referral.referral_status.remaining_to_next + ' more referral' + (referral.referral_status.remaining_to_next === 1 ? '' : 's') + ' until your next reward'}
+                    </p>
+                  )}
+                  {referral.referral_status.reward_text && (
+                    <p className="text-center text-[11px] text-gray-400 mt-1.5">
+                      {'Reward: ' + referral.referral_status.reward_text}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {(referral.address || referral.instagram || referral.facebook || referral.other_contact) && (
                 <div className="border-t border-gray-100 pt-5 space-y-2.5">
