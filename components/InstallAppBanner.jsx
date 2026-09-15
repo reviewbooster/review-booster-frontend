@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 /**
  * components/InstallAppBanner.jsx
@@ -25,6 +25,12 @@ export default function InstallAppBanner() {
     setIsIOS(iosDevice);
 
     if (iosDevice) {
+      setShowBanner(true);
+      return;
+    }
+
+    if (window.__rbInstallPrompt) {
+      setDeferredPrompt(window.__rbInstallPrompt);
       setShowBanner(true);
       return;
     }

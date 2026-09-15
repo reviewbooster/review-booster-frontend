@@ -1,4 +1,4 @@
-import { Html, Head, Main, NextScript } from 'next/document';
+﻿import { Html, Head, Main, NextScript } from 'next/document';
 
 export default function Document() {
   return (
@@ -11,6 +11,11 @@ export default function Document() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ReviewBooster" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "(function(){window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__rbInstallPrompt=e;});})();"
+          }}
+        />
       </Head>
       <body>
         <Main />
