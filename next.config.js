@@ -1,9 +1,10 @@
-/** @type {import('next').NextConfig} */
+﻿/** @type {import('next').NextConfig} */
 const withPWA = require('next-pwa')({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development', // service worker only in production builds
   register: true,
   skipWaiting: true,
+  buildExcludes: [/dynamic-css-manifest\.json$/, /middleware-manifest\.json$/, /app-build-manifest\.json$/],
 });
 
 const nextConfig = {
