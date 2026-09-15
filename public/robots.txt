@@ -1,0 +1,9 @@
+﻿User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /change-password
+Disallow: /pending-approval
+Disallow: /account-rejected
+Disallow: /reset-password
+
+Sitemap: https://reviewbooster.adcend.in/sitemap.xml
