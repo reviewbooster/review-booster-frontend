@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import SEO from '../components/SEO';
 
 const BUSINESS_TYPES = [
   { value: 'salon',       label: 'Salon / Spa' },
@@ -35,7 +36,7 @@ export default function SignupPage() {
   const [error,           setError]           = useState('');
   const [loading,         setLoading]         = useState(false);
 
-  // Engine B — an incoming ?ref=CODE gets validated so we can show who
+  // Engine B â€” an incoming ?ref=CODE gets validated so we can show who
   // referred them and what discount applies, before they submit.
   const [refCode,     setRefCode]     = useState(null);
   const [referrerInfo, setReferrerInfo] = useState(null);
@@ -47,7 +48,7 @@ export default function SignupPage() {
     setRefCode(q);
     api.get('/business-referrals/validate/' + encodeURIComponent(q))
       .then(function(res) { setReferrerInfo(res.data.data); })
-      .catch(function() { /* invalid/expired code — just proceed without the banner */ });
+      .catch(function() { /* invalid/expired code â€” just proceed without the banner */ });
   }, [router.isReady, router.query.ref]);
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-sidebar flex items-start sm:items-center justify-center p-4 py-8">
+      <SEO title="Sign Up" description="Create your free ReviewBooster account and start collecting Google reviews today." path="/signup" />
 
       {/* Background pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

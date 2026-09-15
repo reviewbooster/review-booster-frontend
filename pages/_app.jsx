@@ -1,16 +1,19 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import '../styles/globals.css';
 import { AuthProvider } from '../context/AuthContext';
+import { useRouter } from 'next/router';
+import CookieConsent from '../components/CookieConsent';
+import { trackPageview } from '../lib/analytics';
 
 /**
  * GlobalModalScrollLock
  * Every modal/popup in the app uses the same "fixed inset-0" overlay pattern.
  * This watches the DOM for any such overlay that is actually visible
- * (not display:none, not opacity:0, not pointer-events:none — which is how
+ * (not display:none, not opacity:0, not pointer-events:none â€” which is how
  * hidden-but-mounted overlays like the mobile sidebar backdrop signal
  * "closed") and locks background scroll while it's open.
  *
- * The check is debounced — a MutationObserver on a React app fires very
+ * The check is debounced â€” a MutationObserver on a React app fires very
  * often (every class/state change anywhere), and each check does a
  * document-wide query plus getComputedStyle (which forces a layout read).
  * Running that synchronously on every mutation caused noticeable slowdown
@@ -60,10 +63,22 @@ function GlobalModalScrollLock() {
   return null;
 }
 
+function PageviewTracker() {
+  var router = useRouter();
+  useEffect(function() {
+    function handleRouteChange(url) { trackPageview(url); }
+    router.events.on("routeChangeComplete", handleRouteChange);
+    return function() { router.events.off("routeChangeComplete", handleRouteChange); };
+  }, [router.events]);
+  return null;
+}
+
 export default function App({ Component, pageProps }) {
   return (
     <AuthProvider>
       <GlobalModalScrollLock />
+      <PageviewTracker />
+      <CookieConsent />
       <Component {...pageProps} />
     </AuthProvider>
   );

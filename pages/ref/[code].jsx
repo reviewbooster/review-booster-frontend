@@ -1,9 +1,9 @@
-/**
+﻿/**
  * pages/ref/[code].jsx
  *
- * PUBLIC ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no auth required.
+ * PUBLIC ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no auth required.
  * A customer's personal referral link. Read-only: shows the business,
- * the offer, and the code to show in person. Nothing is submitted here ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â
+ * the offer, and the code to show in person. Nothing is submitted here ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â
  * attribution happens later when staff verify the code at checkout.
  */
 import { useEffect, useState } from 'react';
@@ -74,7 +74,11 @@ export default function ReferralLanding() {
   return (
     <>
       <Head>
-        <title>ReviewBooster</title>
+        <title>{referral ? ((referral.referrer_name ? referral.referrer_name + " invited you to " : "You are invited to ") + referral.business_name) : "ReviewBooster Referral"}</title>
+        <meta property="og:title" content={referral ? (referral.business_name + " -- Referral Invite") : "ReviewBooster"} />
+        <meta property="og:description" content={referral && referral.offer_text ? referral.offer_text : "Youve been invited -- tap to see your referral code."} />
+        <meta property="og:image" content={referral && referral.logo_url ? referral.logo_url : "https://reviewbooster.adcend.in/og-image.jpg"} />
+        <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <div className="min-h-screen bg-gray-50">

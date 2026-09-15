@@ -1,8 +1,8 @@
-/**
+﻿/**
  * pages/r/[token].jsx
- * Customer-facing review page — Phase 2 redesign.
- * PUBLIC — no auth required.
- * Session 14 — desktop optimised, purple SVG stars via StarRating.
+ * Customer-facing review page â€” Phase 2 redesign.
+ * PUBLIC â€” no auth required.
+ * Session 14 â€” desktop optimised, purple SVG stars via StarRating.
  */
 
 import { useState, useEffect } from 'react';
@@ -198,6 +198,10 @@ export default function PublicReviewPage() {
     <>
       <Head>
         <title>{business ? ('Rate ' + business.name) : 'ReviewBooster'}</title>
+        <meta property="og:title" content={business ? ("Rate " + business.name) : "ReviewBooster"} />
+        <meta property="og:description" content={business ? ("Share your experience with " + business.name + " -- it only takes a minute.") : "Share your experience -- it only takes a minute."} />
+        <meta property="og:image" content={business && business.brand_logo_url ? business.brand_logo_url : "https://reviewbooster.adcend.in/og-image.jpg"} />
+        <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 

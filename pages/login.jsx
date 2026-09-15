@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/login.jsx
  *
  * Login screen. Connects to POST /api/auth/login.
@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import SEO from '../components/SEO';
 
 // Replace with your real WhatsApp support number, E.164 digits only (no +, no spaces)
 const SUPPORT_WHATSAPP_NUMBER = '919584417319';
@@ -277,6 +278,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-sidebar flex items-center justify-center p-4">
+      <SEO title="Log In" description="Log in to your ReviewBooster dashboard to manage reviews, feedback, and referrals." path="/login" />
 
       <style jsx>{`
         .login-password-input:-webkit-autofill,
@@ -300,8 +302,8 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-3">
-            <span className="text-3xl">{"\u2B50"}</span>
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <img src="/icon-192.png" alt="ReviewBooster" className="w-10 h-10 rounded-xl" />
             <span className="text-white font-bold text-2xl tracking-tight">
               Review<span className="text-brand-500">Booster</span>
             </span>
