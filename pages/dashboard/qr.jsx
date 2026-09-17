@@ -7,7 +7,7 @@ import api from '../../lib/api';
 
 // -- Staff QR Codes -------------------------------------------------------
 // Each staff-directory member can have their own QR that auto-attributes
-// the resulting review request to them — no picker needed at all, good for
+// the resulting review request to them  --  no picker needed at all, good for
 // a sticker at their own chair/station. Dynamic list (not a fixed template),
 // so unlike the print templates above, these render on the fly per name.
 function StaffQrSection({ baseQrUrl, businessName }) {
@@ -323,6 +323,7 @@ function AllTemplatesModal({ businessName, onDownload, onCustomDownload, customT
 }
 
 function QrPage() {
+  useEffect(function() { localStorage.setItem('rb_visited_qr', '1'); }, []);
   const [qrData,           setQrData]           = useState(null);
   const [stats,            setStats]            = useState(null);
   const [customTemplates,  setCustomTemplates]  = useState([]);

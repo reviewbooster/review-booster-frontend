@@ -7,14 +7,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-} from 'recharts';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import GettingStartedChecklist from '../../components/GettingStartedChecklist';
 
 const PERIOD_OPTIONS = [
   { days: 7,  label: 'Last 7 days' },
@@ -41,12 +38,6 @@ function getTrendSuffix(days) {
   if (days === 7)  return 'vs prev 7 days';
   if (days === 90) return 'vs prev 3 months';
   return 'vs prev 30 days';
-}
-
-function formatChartDate(v) {
-  if (!v) return '';
-  const d = new Date(v);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function calcTrend(current, previous) {
@@ -143,32 +134,6 @@ function AvgCard({ summary, mtd, mobile }) {
   );
 }
 
-/* --- Single funnel row ----------------------------------------------------- */
-function FunnelRow({ icon, isGoogle, label, value, pct, color }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className="w-[18px] h-[18px] rounded-md flex items-center justify-center shrink-0"
-        style={{ backgroundColor: color + '22' }}
-      >
-        {isGoogle
-          ? <span style={{ fontSize: '9px', fontWeight: 900, color: '#4285F4', lineHeight: 1 }}>G</span>
-          : <span style={{ fontSize: '9px', color: color, lineHeight: 1 }}>{icon}</span>
-        }
-      </div>
-      <span className="text-[11px] text-gray-500 shrink-0 whitespace-nowrap">{label}</span>
-      <div className="flex-1 rounded-full overflow-hidden" style={{ height: '5px', backgroundColor: '#F3F4F6' }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: pct + '%', backgroundColor: color }}
-        />
-      </div>
-      <span className="text-[11px] font-bold text-gray-700 tabular-nums shrink-0" style={{ width: '26px', textAlign: 'right' }}>{value}</span>
-      <span className="text-[10px] text-gray-400 tabular-nums shrink-0" style={{ width: '36px', textAlign: 'right' }}>{pct + '%'}</span>
-    </div>
-  );
-}
-
 /* --- Loading skeleton ------------------------------------------------------ */
 function DashboardSkeleton() {
   return (
@@ -183,18 +148,15 @@ function DashboardSkeleton() {
         <div className="flex flex-col gap-2 h-[250px]">
           <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
           <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
-          <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
         </div>
       </div>
-      <div className="hidden md:grid md:grid-cols-4 gap-4 mb-5">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="hidden md:grid md:grid-cols-3 gap-4 mb-5">
+        {[1, 2, 3].map((i) => (
           <div key={i} className={'h-36 rounded-2xl animate-pulse ' + (i === 1 ? 'bg-gray-200' : 'bg-gray-100')} />
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="h-52 bg-gray-100 rounded-2xl animate-pulse" />
-        <div className="h-52 bg-gray-100 rounded-2xl animate-pulse" />
-      </div>
+      <div className="h-14 bg-gray-100 rounded-2xl animate-pulse mb-5" />
+      <div className="h-20 bg-gray-100 rounded-2xl animate-pulse" />
     </DashboardLayout>
   );
 }
@@ -210,10 +172,8 @@ function DashboardPage() {
   const [rangeEnd,      setRangeEnd]      = useState('');
   const [rangeError,    setRangeError]    = useState('');
   const [summary,       setSummary]       = useState(null);
-  const [chartData,     setChartData]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [fetching,      setFetching]      = useState(false);
-  const [mounted,       setMounted]       = useState(false);
   const [error,         setError]         = useState('');
   const [needsGoogleUrl, setNeedsGoogleUrl] = useState(false);
   const [unresolvedCount, setUnresolvedCount] = useState(0);
@@ -224,14 +184,13 @@ function DashboardPage() {
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
 
-  useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
     if (typeof window !== 'undefined' && sessionStorage.getItem('rb_dismiss_google_banner') === '1') {
       setGoogleBannerDismissed(true);
     }
   }, []);
 
-  // Total verified referrals ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â quiet, all-time count for the summary card below.
+  // Total verified referrals -- quiet, all-time count for the summary card below.
   useEffect(() => {
     if (user?.role === 'super_admin') return;
     api.get('/referrals/stats')
@@ -294,12 +253,8 @@ function DashboardPage() {
         const query = dateMode === 'range' && rangeStart && rangeEnd
           ? 'start_date=' + rangeStart + '&end_date=' + rangeEnd
           : 'days=' + selectedDays;
-        const [sumRes, chartRes] = await Promise.all([
-          api.get('/analytics/summary?' + query),
-          api.get('/analytics/reviews-over-time?' + query),
-        ]);
+        const sumRes = await api.get('/analytics/summary?' + query);
         setSummary(sumRes.data.data);
-        setChartData(chartRes.data.data || []);
       } catch {
         setError('Failed to load dashboard data.');
       } finally {
@@ -338,34 +293,9 @@ function DashboardPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const total       = summary?.total_requests_sent || 0;
-  const calcPct     = (v) => total > 0 ? Math.round(((v || 0) / total) * 100) : 0;
   const mtd         = summary?.this_month ?? null;
   const lmtd        = summary?.last_month ?? null;
-  const effectiveDays = dateMode === 'range' && rangeStart && rangeEnd
-    ? Math.max(1, Math.round((new Date(rangeEnd) - new Date(rangeStart)) / 86400000) + 1)
-    : selectedDays;
   const trendSuffix = dateMode === 'range' ? 'vs previous period' : getTrendSuffix(selectedDays);
-
-  // X-axis tick interval: show ~6 labels regardless of period length
-  const chartInterval = effectiveDays <= 7 ? 0 : effectiveDays <= 30 ? 4 : 13;
-
-  const funnelRows = [
-    { icon: '\u25B8', isGoogle: false, label: 'Requests Sent',    value: total,                          pct: 100,                               color: '#60A5FA' },
-    { icon: '\u2192', isGoogle: false, label: 'Delivered',        value: summary?.total_delivered  ?? 0, pct: calcPct(summary?.total_delivered),  color: '#2DD4BF' },
-    { icon: '\u25CB', isGoogle: false, label: 'Opened',           value: summary?.total_opened     ?? 0, pct: calcPct(summary?.total_opened),     color: '#FBBF24' },
-    { icon: '\u2713', isGoogle: false, label: 'Submitted',        value: summary?.total_reviews    ?? 0, pct: calcPct(summary?.total_reviews),    color: '#34D399' },
-    { icon: '',       isGoogle: true,  label: 'Posted to Google', value: summary?.total_public     ?? 0, pct: calcPct(summary?.total_public),     color: '#818CF8' },
-  ];
-
-  const totalPrivate    = summary?.total_private ?? 0;
-  const totalUnresolved = summary?.total_unresolved ?? 0;
-  const totalResolved   = Math.max(0, totalPrivate - totalUnresolved);
-  const calcFeedbackPct = (v) => totalPrivate > 0 ? Math.round(((v || 0) / totalPrivate) * 100) : 0;
-  const feedbackStatusRows = [
-    { icon: '\u2713', isGoogle: false, label: 'Resolved',   value: totalResolved,   pct: calcFeedbackPct(totalResolved),   color: '#34D399' },
-    { icon: '\u26A0', isGoogle: false, label: 'Unresolved', value: totalUnresolved, pct: calcFeedbackPct(totalUnresolved), color: '#F87171' },
-  ];
 
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24)))
@@ -387,20 +317,6 @@ function DashboardPage() {
       trend: calcTrend(mtd?.total_public ?? 0, lmtd?.total_public),
       trendSuffix,
     },
-    businessPlan === 'trial' && trialDaysLeft !== null
-      ? {
-          icon: '\u23F3', iconBg: 'bg-amber-50',
-          label: 'Trial Days Left',
-          value: trialDaysLeft,
-          isTrialCard: true,
-        }
-      : {
-          icon: '\uD83D\uDEA9', iconBg: 'bg-red-50',
-          label: 'Private Feedback',
-          value: summary?.total_private ?? 0,
-          trend: calcTrend(mtd?.total_private ?? 0, lmtd?.total_private),
-          trendSuffix,
-        },
   ];
 
   return (
@@ -550,12 +466,19 @@ function DashboardPage() {
             </div>
           )}
         </div>
+        {businessPlan === 'trial' && trialDaysLeft !== null && (
+          <p className="text-[11px] text-amber-600 font-medium mt-2.5">
+            {'Trial ends in ' + trialDaysLeft + ' day' + (trialDaysLeft === 1 ? '' : 's') + ' \u00b7 '}
+            <Link href="/dashboard/settings" className="underline hover:text-amber-700">Upgrade plan</Link>
+          </p>
+        )}
       </div>
 
+        <GettingStartedChecklist hasGoogleLink={!needsGoogleUrl} hasSentRequest={(summary?.total_requests_sent || 0) > 0} />
       {/* Data sections -- fade during period re-fetch */}
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
-        {/* Mobile: avg card + 3 mini cards */}
+        {/* Mobile: avg card + 2 mini cards */}
         <div className="md:hidden grid grid-cols-2 gap-2.5 mb-5">
           <AvgCard summary={summary} mtd={mtd} mobile />
           <div className="flex flex-col gap-2 h-[250px]">
@@ -563,16 +486,26 @@ function DashboardPage() {
           </div>
         </div>
 
-        {/* Desktop: flat 4-col row */}
-        <div className="hidden md:grid md:grid-cols-4 gap-4 mb-5">
+        {/* Desktop: flat 3-col row */}
+        <div className="hidden md:grid md:grid-cols-3 gap-4 mb-5">
           <AvgCard summary={summary} mtd={mtd} />
           {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
         </div>
 
-        {/* Referral program ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â total verified referrals, all-time */}
+        {/* Primary action -- the one thing an owner needs to do fast, in
+            front of a customer, every single time. */}
+        <Link
+          href="/dashboard/send-request"
+          className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm py-3.5 rounded-2xl mb-5 transition-colors shadow-sm"
+        >
+          <span>{'\u2B50'}</span>
+          Send Review Request
+        </Link>
+
+        {/* Referral program -- total verified referrals, all-time */}
         <Link
           href="/dashboard/referrals"
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-5 flex items-center gap-3 hover:border-purple-200 transition-colors"
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-purple-200 transition-colors"
         >
           <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#F3E8FF' }}>
             <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="2" viewBox="0 0 24 24">
@@ -587,107 +520,6 @@ function DashboardPage() {
           </div>
           <span className="ml-auto text-[11px] font-semibold text-purple-600 shrink-0">View Referrals {'\u2192'}</span>
         </Link>
-
-        {/* Funnel + Chart */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Review Funnel */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[13px] font-bold text-gray-800">Review Funnel</h2>
-              <Link href="/dashboard/reviews" className="text-[11px] font-semibold text-purple-600 hover:underline">
-                View all
-              </Link>
-            </div>
-            <div className="space-y-3.5">
-              {funnelRows.map((row) => (
-                <FunnelRow
-                  key={row.label}
-                  icon={row.icon}
-                  isGoogle={row.isGoogle}
-                  label={row.label}
-                  value={row.value}
-                  pct={row.pct}
-                  color={row.color}
-                />
-              ))}
-            </div>
-            {totalPrivate > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-50">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Private Feedback Status</h3>
-                  <Link href="/dashboard/feedback" className="text-[11px] font-semibold text-purple-600 hover:underline">
-                    View all
-                  </Link>
-                </div>
-                <div className="space-y-3.5">
-                  {feedbackStatusRows.map((row) => (
-                    <FunnelRow
-                      key={row.label}
-                      icon={row.icon}
-                      isGoogle={row.isGoogle}
-                      label={row.label}
-                      value={row.value}
-                      pct={row.pct}
-                      color={row.color}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            {(summary?.total_private ?? 0) > 0 && (summary?.total_public ?? 0) === 0 && (
-              <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-50">
-                {summary.total_private + ' review' + (summary.total_private === 1 ? '' : 's') + ' went to private feedback instead of Google \u2014 nothing\'s broken, that\'s expected for low ratings.'}
-              </p>
-            )}
-          </div>
-
-          {/* Reviews Over Time */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[13px] font-bold text-gray-800">Reviews Over Time</h2>
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-[10px] text-gray-400">
-                  <span style={{ display: 'inline-block', width: '14px', height: '2.5px', backgroundColor: '#22C55E', borderRadius: '9999px' }} />
-                  Google
-                </span>
-                <span className="flex items-center gap-1 text-[10px] text-gray-400">
-                  <span style={{ display: 'inline-block', width: '14px', height: '2.5px', backgroundColor: '#EF4444', borderRadius: '9999px' }} />
-                  Private
-                </span>
-              </div>
-            </div>
-            {!mounted ? (
-              <div className="h-44 bg-gray-50 rounded-xl animate-pulse" />
-            ) : (
-              <ResponsiveContainer width="100%" height={190}>
-                <LineChart data={chartData} margin={{ top: 5, right: 8, bottom: 5, left: -22 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 9, fill: '#9CA3AF' }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={formatChartDate}
-                    interval={chartInterval}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 9, fill: '#9CA3AF' }}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{ fontSize: 11, borderRadius: '10px', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', padding: '6px 10px' }}
-                    labelFormatter={formatChartDate}
-                  />
-                  <Line type="monotone" dataKey="google" stroke="#22C55E" strokeWidth={2.5} dot={{ r: 3.5, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 5 }} name="Google" />
-                  <Line type="monotone" dataKey="pvt"    stroke="#EF4444" strokeWidth={2.5} dot={{ r: 3.5, fill: '#EF4444', strokeWidth: 0 }} activeDot={{ r: 5 }} name="Private" />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
       </div>
     </DashboardLayout>
   );

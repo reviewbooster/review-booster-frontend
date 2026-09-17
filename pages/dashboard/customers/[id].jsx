@@ -1,6 +1,6 @@
 /**
  * pages/dashboard/customers/[id].jsx
- * Customer Detail — profile, request history, submitted reviews.
+ * Customer Detail â€” profile, request history, submitted reviews.
  */
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
@@ -90,7 +90,7 @@ function buildLink(channel, customer, reviewUrl) {
   return reviewUrl;
 }
 
-// ── Edit Customer Modal ───────────────────────────────────────────────────────
+// â”€â”€ Edit Customer Modal  -- 
 function EditCustomerModal({ customer, onClose, onUpdated }) {
   var [form, setForm] = useState({
     name:      customer.name      || '',
@@ -189,7 +189,7 @@ function EditCustomerModal({ customer, onClose, onUpdated }) {
   );
 }
 
-// ── Send Request Modal ────────────────────────────────────────────────────────
+// â”€â”€ Send Request Modal  -- 
 function SendRequestModal({ customer, onClose, onSent }) {
   var [loadingCh, setLoadingCh] = useState(null);
   var [error,     setError]     = useState('');
@@ -321,7 +321,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
   );
 }
 
-// ── Customer Detail Page ──────────────────────────────────────────────────────
+// â”€â”€ Customer Detail Page  -- 
 function CustomerDetailPage() {
   var router = useRouter();
   var { id } = router.query;
@@ -366,7 +366,7 @@ function CustomerDetailPage() {
     ? (reviews.reduce(function (s, r) { return s + r.rating; }, 0) / reviews.length).toFixed(1)
     : null;
 
-  // ── Loading skeleton ────────────────────────────────────────────────────────
+  // â”€â”€ Loading skeleton  -- 
   if (loading) {
     return (
       <DashboardLayout>
@@ -392,7 +392,7 @@ function CustomerDetailPage() {
     );
   }
 
-  // ── Error state ─────────────────────────────────────────────────────────────
+  // â”€â”€ Error state  -- 
   if (error || !customer) {
     return (
       <DashboardLayout>

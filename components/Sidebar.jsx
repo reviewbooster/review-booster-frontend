@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
@@ -6,25 +6,51 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import api from "../lib/api";
 import NotificationDropdown from "./NotificationDropdown";
 
-const OWNER_NAV = [
-  { href: "/dashboard",           icon: "\u25C8", label: "Dashboard" },
-  { href: "/dashboard/customers", icon: "\u25C9", label: "Customers" },
-  { href: "/dashboard/qr",        icon: "\u25A3", label: "QR Code"   },
-  { href: "/dashboard/reviews",   icon: "\u2605", label: "Reviews"   },
-  { href: "/dashboard/feedback",  icon: "\u2691", label: "Feedback",  badge: true },
+// Flat top-level nav -- each item is a hub/landing page. matchPrefixes lists
+// every child route that should still show this item as "active" once you've
+// drilled into a card from the hub (e.g. /dashboard/customers stays under Reviews).
+const OWNER_NAV_TOP = [
+  {
+    href: "/dashboard",
+    icon: "\u25C8",
+    label: "Home",
+    matchPrefixes: ["/dashboard"],
+    exact: true,
+  },
+  {
+    href: "/dashboard/reviews-hub",
+    icon: "\u2605",
+    label: "Reviews",
+    badge: true,
+    matchPrefixes: [
+      "/dashboard/reviews-hub",
+      "/dashboard/customers",
+      "/dashboard/qr",
+      "/dashboard/reviews",
+      "/dashboard/feedback",
+      "/dashboard/send-request",
+    ],
+  },
+  {
+    href: "/dashboard/growth-hub",
+    icon: "\uD83D\uDCC8",
+    label: "Growth",
+    matchPrefixes: [
+      "/dashboard/growth-hub",
+      "/dashboard/referrals",
+      "/dashboard/refer-a-business",
+      "/dashboard/win-back",
+      "/dashboard/analytics",
+    ],
+  },
+  {
+    href: "/dashboard/settings-hub",
+    icon: "\u2699",
+    label: "Settings",
+    matchPrefixes: ["/dashboard/settings-hub", "/dashboard/team", "/dashboard/settings"],
+  },
 ];
 
-const OWNER_SECONDARY_NAV = [
-  { href: "/dashboard/team",              icon: "\uD83D\uDC65", label: "Team",              ownerOnly: true },
-  { href: "/dashboard/referrals",         icon: "\uD83C\uDF81", label: "Referrals",         ownerOnly: false },
-  { href: "/dashboard/refer-a-business",  icon: "\uD83C\uDF1F", label: "Refer a Business",  ownerOnly: true },
-  { href: "/dashboard/win-back",          icon: "\uD83D\uDC8C", label: "Win-Back",          ownerOnly: true },
-  { href: "/dashboard/settings",          icon: "\u2699",        label: "Settings",          ownerOnly: true },
-];
-// Flat list -- used for mobile bottom nav (grouping doesn't fit there).
-// Only links to pages that actually exist; more groups from the Super
-// Admin doc (Customers, Reviews, Feedback, Users & Staff, Settings,
-// System Health) get added here once those pages are built.
 const ADMIN_NAV = [
   { href: "/dashboard/admin/dashboard",    icon: "\uD83D\uDCCA", label: "Dashboard",    mobileLabel: "Dashboard", activeClass: "bg-purple-50 text-purple-600" },
   { href: "/dashboard/admin",              icon: "\uD83C\uDFE2", label: "Businesses",   mobileLabel: "Businesses", activeClass: "bg-blue-50 text-blue-600" },
@@ -182,20 +208,50 @@ function CloseIcon() {
   );
 }
 
-const NAV_ICONS = {
-  "/dashboard":           HomeIcon,
-  "/dashboard/customers": UsersIcon,
-  "/dashboard/qr":        QRCodeIcon,
-  "/dashboard/reviews":   StarNavIcon,
-  "/dashboard/feedback":  FlagNavIcon,
+function GrowthIcon({ active }) {
+  var sw = active ? "2.5" : "1.8";
+  return (
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+      <path
+        d="M3 17l6-6 4 4 8-8"
+        stroke="currentColor"
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M15 7h6v6" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SettingsGearIcon({ active }) {
+  var sw = active ? "2.2" : "1.8";
+  return (
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth={sw} />
+      <path
+        d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"
+        stroke="currentColor"
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Icons for the flat top-level nav -- desktop uses the emoji/text icons in
+// OWNER_NAV_TOP directly; mobile top bar + bottom bar use these SVG versions.
+const TOP_NAV_ICONS = {
+  "/dashboard":               HomeIcon,
+  "/dashboard/reviews-hub":   StarNavIcon,
+  "/dashboard/growth-hub":    GrowthIcon,
+  "/dashboard/settings-hub":  SettingsGearIcon,
 };
 
 export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) {
   const router = useRouter();
   const { user, logout } = useAuth();
-  var visibleSecondaryNav = OWNER_SECONDARY_NAV.filter(function(item) {
-    return !item.ownerOnly || user?.role !== "staff";
-  });
   const [dropdownOpen,       setDropdownOpen]       = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [drawerOpen,         setDrawerOpen]         = useState(false);
@@ -280,6 +336,44 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
     return "bg-gray-100 text-gray-500";
   }
 
+  // A top-level item (e.g. "Reviews") stays highlighted for its whole family
+  // of child pages, not just the hub page itself -- so it's still obvious
+  // which section you're in once you've drilled into a card.
+  function isTopNavActive(item) {
+    if (item.exact) return router.pathname === item.href;
+    return item.matchPrefixes.some(function(p) {
+      return router.pathname === p || router.pathname.startsWith(p + "/");
+    });
+  }
+
+  function renderOwnerTop(onItemClick, itemPaddingClass) {
+    return (
+      <>
+        {OWNER_NAV_TOP.map(function(item) {
+          var active = isTopNavActive(item);
+          var Icon = TOP_NAV_ICONS[item.href];
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onItemClick}
+              className={"flex items-center gap-3 px-3 " + itemPaddingClass + " rounded-lg text-sm font-medium transition-all duration-150 " +
+                (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
+            >
+              <Icon active={active} />
+              <span>{item.label}</span>
+              {item.badge && unresolvedCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                  {unresolvedCount > 99 ? "99+" : unresolvedCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </>
+    );
+  }
+
   return (
     <>
       {/* -------- DESKTOP SIDEBAR -------- */}
@@ -343,49 +437,10 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               );
             })
           ) : (
-            OWNER_NAV.map(({ href, icon, label, badge }) => {
-              const active = isActive(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={"flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative " +
-                    (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-                >
-                  <span className={"text-base transition-transform duration-150 " + (active ? "scale-110" : "group-hover:scale-110")}>
-                    {icon}
-                  </span>
-                  <span>{label}</span>
-                  {badge && unresolvedCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                      {unresolvedCount > 99 ? "99+" : unresolvedCount}
-                    </span>
-                  )}
-                </Link>
-              );
-            })
+            renderOwnerTop(undefined, "py-2.5")
           )}
         </nav>
 
-        {user?.role !== "super_admin" && (
-  <div className="px-3 pb-2">
-    <div className="h-px bg-gray-100 mb-2" />
-    {visibleSecondaryNav.map(({ href, icon, label }) => {
-      const active = isActive(href);
-      return (
-        <Link
-          key={href}
-          href={href}
-          className={"flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 " +
-            (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-        >
-          <span className="text-base">{icon}</span>
-          <span>{label}</span>
-        </Link>
-      );
-    })}
-  </div>
-)}
 <div className="px-3 py-4 border-t border-gray-100" ref={desktopRef}>
           <div className="relative">
             <button
@@ -489,7 +544,10 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       </div>
 
       {/* -------- MOBILE BOTTOM NAV -------- */}
-      <nav className="flex md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30">
+      <nav
+        className="flex md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         {user?.role === "super_admin" ? (
           <div className="flex justify-around w-full py-1">
             {ADMIN_NAV.map(function({ href, icon, mobileLabel, count, pendingBadge }) {
@@ -514,25 +572,54 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
             })}
           </div>
         ) : (
-          <div className="flex w-full py-1">
-            {OWNER_NAV.map(({ href, label, badge }) => {
-              const active = isActive(href);
-              const count  = badge ? unresolvedCount : 0;
-              const Icon   = NAV_ICONS[href];
+          <div className="relative flex w-full py-1 items-center">
+            {OWNER_NAV_TOP.slice(0, 2).map(function(item) {
+              var active = isTopNavActive(item);
+              var count  = item.badge ? unresolvedCount : 0;
+              var Icon   = TOP_NAV_ICONS[item.href];
               return (
                 <Link
-                  key={href}
-                  href={href}
+                  key={item.href}
+                  href={item.href}
                   className={"relative flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors " +
                     (active ? "text-purple-600" : "text-gray-400")}
                 >
                   <Icon active={active} />
-                  <span className="text-[10px] font-medium">{label}</span>
+                  <span className="text-[10px] font-medium">{item.label}</span>
                   {count > 0 && (
                     <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                       {count > 9 ? "9+" : count}
                     </span>
                   )}
+                </Link>
+              );
+            })}
+
+            {/* Raised center action -- the one time-sensitive task (sending a
+                review request in front of a customer), always one tap away
+                from anywhere in the app, distinct from ordinary navigation. */}
+            <div className="flex-1 flex justify-center">
+              <Link
+                href="/dashboard/send-request"
+                className="flex flex-col items-center justify-center -mt-7 w-14 h-14 rounded-full bg-purple-600 text-white shadow-lg shadow-purple-300/50 active:scale-95 transition-transform"
+                aria-label="Send Review Request"
+              >
+                <span className="text-2xl leading-none font-light">{'+'}</span>
+              </Link>
+            </div>
+
+            {OWNER_NAV_TOP.slice(2, 4).map(function(item) {
+              var active = isTopNavActive(item);
+              var Icon   = TOP_NAV_ICONS[item.href];
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={"relative flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors " +
+                    (active ? "text-purple-600" : "text-gray-400")}
+                >
+                  <Icon active={active} />
+                  <span className="text-[10px] font-medium">{item.label}</span>
                 </Link>
               );
             })}
@@ -592,49 +679,9 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               );
             })
           ) : (
-            OWNER_NAV.map(function({ href, icon, label, badge }) {
-              var active = isActive(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={function() { setDrawerOpen(false); }}
-                  className={"flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 " +
-                    (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-                >
-                  <span className={"text-base " + (active ? "scale-110" : "")}>{icon}</span>
-                  <span>{label}</span>
-                  {badge && unresolvedCount > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                      {unresolvedCount > 99 ? "99+" : unresolvedCount}
-                    </span>
-                  )}
-                </Link>
-              );
-            })
+            renderOwnerTop(function() { setDrawerOpen(false); }, "py-3")
           )}
         </nav>
-
-        {user?.role !== "super_admin" && (
-  <div className="px-3 pb-2">
-    <div className="h-px bg-gray-100 mb-2" />
-    {visibleSecondaryNav.map(({ href, icon, label }) => {
-      const active = isActive(href);
-      return (
-        <Link
-          key={href}
-          href={href}
-          onClick={function() { setDrawerOpen(false); }}
-          className={"flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 " +
-            (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-        >
-          <span className="text-base">{icon}</span>
-          <span>{label}</span>
-        </Link>
-      );
-    })}
-  </div>
-)}
       </div>
 
       {notifToast && !showNotifications && (
