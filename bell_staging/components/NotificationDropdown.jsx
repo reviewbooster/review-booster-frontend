@@ -10,17 +10,6 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-function urlBase64ToUint8Array(base64String) {
-  var padding = '='.repeat((4 - base64String.length % 4) % 4);
-  var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  var rawData = window.atob(base64);
-  var outputArray = new Uint8Array(rawData.length);
-  for (var i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
 function FeedbackIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,50 +39,9 @@ function CloseIcon() {
   );
 }
 
-function BellIcon() {
-  return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-    </svg>
-  );
-}
-
-// -- Push notification permission/subscription state, checked on mount --
-function usePushState() {
-  var [supported,  setSupported]  = useState(false);
-  var [permission, setPermission] = useState('default');
-  var [subscribed, setSubscribed] = useState(false);
-  var [checking,   setChecking]   = useState(true);
-
-  var refresh = async function() {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setSupported(false);
-      setChecking(false);
-      return;
-    }
-    setSupported(true);
-    setPermission(Notification.permission);
-    try {
-      var reg = await navigator.serviceWorker.getRegistration();
-      var sub = reg ? await reg.pushManager.getSubscription() : null;
-      setSubscribed(!!sub);
-    } catch (e) {
-      setSubscribed(false);
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  useEffect(function() { refresh(); }, []);
-
-  return { supported, permission, subscribed, checking, refresh: refresh, setSubscribed: setSubscribed, setPermission: setPermission };
-}
-
 export default function NotificationDropdown({ onClose, onUnreadChange }) {
   var [notifications, setNotifications] = useState([]);
   var [loading,       setLoading]       = useState(true);
-  var push = usePushState();
-  var [pushBusy, setPushBusy] = useState(false);
 
   var fetchAll = async function() {
     try {
@@ -142,53 +90,6 @@ export default function NotificationDropdown({ onClose, onUnreadChange }) {
       onUnreadChange(0);
     } catch (e) {
       console.error('clearAll failed', e);
-    }
-  };
-
-  var enablePush = async function() {
-    setPushBusy(true);
-    try {
-      var permission = await Notification.requestPermission();
-      push.setPermission(permission);
-      if (permission !== 'granted') { return; }
-
-      var reg = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      var res = await api.get('/notifications/vapid-public-key');
-      var key = res.data && res.data.key;
-      if (!key) return;
-
-      var sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
-      });
-
-      await api.post('/notifications/subscribe', sub.toJSON());
-      push.setSubscribed(true);
-      localStorage.removeItem('rb_push_dismissed');
-    } catch (e) {
-      console.error('enablePush failed', e);
-    } finally {
-      setPushBusy(false);
-    }
-  };
-
-  var disablePush = async function() {
-    setPushBusy(true);
-    try {
-      var reg = await navigator.serviceWorker.getRegistration();
-      var sub = reg ? await reg.pushManager.getSubscription() : null;
-      if (sub) {
-        var endpoint = sub.endpoint;
-        await sub.unsubscribe();
-        api.post('/notifications/unsubscribe', { endpoint: endpoint }).catch(function() {});
-      }
-      push.setSubscribed(false);
-      localStorage.setItem('rb_push_dismissed', '1');
-    } catch (e) {
-      console.error('disablePush failed', e);
-    } finally {
-      setPushBusy(false);
     }
   };
 
@@ -242,7 +143,7 @@ export default function NotificationDropdown({ onClose, onUnreadChange }) {
         </div>
 
         {/* List */}
-        <div className="overflow-y-auto" style={{ maxHeight: '55vh' }}>
+        <div className="overflow-y-auto" style={{ maxHeight: '70vh' }}>
 
           {loading && (
             <div className="py-10 text-center text-gray-400 text-sm">Loading...</div>
@@ -296,33 +197,6 @@ export default function NotificationDropdown({ onClose, onUnreadChange }) {
           })}
 
         </div>
-
-        {/* Push notification toggle footer */}
-        {push.supported && !push.checking && (
-          <div className="border-t border-gray-100 px-4 py-3">
-            {push.permission === 'denied' ? (
-              <div className="flex items-center gap-2.5 text-xs text-gray-400">
-                <BellIcon />
-                <span>Notifications are blocked in your phone's settings for this app.</span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-sm text-gray-700">
-                  <BellIcon />
-                  <span>Push notifications</span>
-                </div>
-                <button
-                  type="button"
-                  disabled={pushBusy}
-                  onClick={push.subscribed ? disablePush : enablePush}
-                  className={'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 shrink-0 disabled:opacity-50 ' + (push.subscribed ? 'bg-purple-600' : 'bg-gray-300')}
-                >
-                  <span className={'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ' + (push.subscribed ? 'translate-x-6' : 'translate-x-1')} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </>
   );
