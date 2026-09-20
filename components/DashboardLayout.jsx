@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar unresolvedCount={unresolvedCount} resetRequestCount={resetRequestCount} />
-      <main className="flex-1 md:ml-60 px-4 md:px-8 pt-16 pb-24 md:pt-8 md:pb-8 min-h-screen">
+      <main className="flex-1 min-w-0 md:ml-60 px-4 md:px-8 pt-16 pb-24 md:pt-8 md:pb-8 min-h-screen">
         <InstallAppBanner />
         {children}
       </main>
