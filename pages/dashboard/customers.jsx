@@ -530,7 +530,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
               <div>
                 <p className="label mb-1">Or copy the link</p>
                 <div className="flex gap-2">
-                  <input readOnly value={result.reviewUrl} className="input text-xs flex-1 font-mono"
+                  <input readOnly value={result.reviewUrl} className="input text-base sm:text-xs flex-1 font-mono"
                     onFocus={e => e.target.select()} />
                   <button onClick={copyLink}
                     className={'py-2 px-3 rounded-xl text-sm font-semibold border transition-colors duration-150 ' +
@@ -1109,7 +1109,7 @@ function CustomersPage() {
             </svg>
           </span>
           <input
-            className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
+            className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-base sm:text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
             placeholder="Search by name, phone or email..."
             value={search}
             onChange={e => handleSearch(e.target.value)} />
@@ -1277,13 +1277,13 @@ function CustomersPage() {
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
                   {c.tags && c.tags.indexOf('referral') !== -1 && (
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 shrink-0">
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 shrink-0">
                       Referred
                     </span>
                   )}
                   {c.tags && c.tags.filter(function(t) { return t !== 'referral'; }).map(function(t) {
                     return (
-                      <span key={t} className={'text-[9px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0 ' + tagStyle(t)}>
+                      <span key={t} className={'text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ' + tagStyle(t)}>
                         {tagLabel(t)}
                       </span>
                     );

@@ -669,7 +669,7 @@ function FeedbackPage() {
             </svg>
           </span>
           <input
-            className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
+            className="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-3 text-base sm:text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200 transition"
             placeholder="Search feedback..."
             value={search}
             onChange={function(e) { handleSearch(e.target.value); }} />

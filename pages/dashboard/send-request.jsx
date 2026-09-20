@@ -233,7 +233,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
               <div>
                 <p className="label mb-1">Or copy the link</p>
                 <div className="flex gap-2">
-                  <input readOnly value={result.reviewUrl} className="input text-xs flex-1 font-mono"
+                  <input readOnly value={result.reviewUrl} className="input text-base sm:text-xs flex-1 font-mono"
                     onFocus={e => e.target.select()} />
                   <button onClick={copyLink}
                     className={'py-2 px-3 rounded-xl text-sm font-semibold border transition-colors duration-150 ' +
