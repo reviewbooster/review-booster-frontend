@@ -59,7 +59,7 @@ export default function PushPermissionPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[70] bg-white rounded-2xl shadow-xl border border-purple-100 px-4 py-3.5 flex items-center gap-3 max-w-sm mx-4 md:mx-0 animate-slide-up">
+    <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 z-[70] bg-white rounded-2xl shadow-xl border border-purple-100 px-4 py-3.5 flex items-center gap-3 md:max-w-sm animate-slide-up">
       <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0 text-purple-600 text-lg">
         {'\uD83D\uDD14'}
       </div>
