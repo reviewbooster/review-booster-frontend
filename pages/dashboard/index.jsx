@@ -14,9 +14,11 @@ import { useAuth } from '../../context/AuthContext';
 import GettingStartedChecklist from '../../components/GettingStartedChecklist';
 
 const PERIOD_OPTIONS = [
+  { days: 1,  label: 'Today' },
   { days: 7,  label: 'Last 7 days' },
   { days: 30, label: 'Last 30 days' },
   { days: 90, label: 'Last 3 months' },
+  { days: 3650, label: 'Till now' },
 ];
 
 function getGreeting() {
@@ -164,12 +166,25 @@ function DashboardSkeleton() {
 /* --- Main page ------------------------------------------------------------- */
 function DashboardPage() {
   const { user }                          = useAuth();
-  const [selectedDays,  setSelectedDays]  = useState(30);
+  const [selectedDays,  setSelectedDays]  = useState(function() {
+    if (typeof window === 'undefined') return 30;
+    var saved = parseInt(localStorage.getItem('rb_dashboard_days'), 10);
+    return Number.isFinite(saved) && saved >= 1 ? saved : 30;
+  });
   const [dropdownOpen,  setDropdownOpen]  = useState(false);
   const [customDaysInput, setCustomDaysInput] = useState('');
-  const [dateMode,      setDateMode]      = useState('preset'); // 'preset' | 'range'
-  const [rangeStart,    setRangeStart]    = useState('');
-  const [rangeEnd,      setRangeEnd]      = useState('');
+  const [dateMode,      setDateMode]      = useState(function() {
+    if (typeof window === 'undefined') return 'preset';
+    return localStorage.getItem('rb_dashboard_date_mode') === 'range' ? 'range' : 'preset';
+  }); // 'preset' | 'range'
+  const [rangeStart,    setRangeStart]    = useState(function() {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('rb_dashboard_range_start') || '';
+  });
+  const [rangeEnd,      setRangeEnd]      = useState(function() {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('rb_dashboard_range_end') || '';
+  });
   const [rangeError,    setRangeError]    = useState('');
   const [summary,       setSummary]       = useState(null);
   const [loading,       setLoading]       = useState(true);
@@ -209,7 +224,7 @@ function DashboardPage() {
         setBusinessPlan(res.data?.data?.plan ?? null);
         setTrialEndsAt(res.data?.data?.trial_ends_at ?? null);
         const createdAt = res.data?.data?.created_at;
-        if (createdAt) {
+        if (createdAt && !localStorage.getItem('rb_dashboard_days')) {
           const ageDays = (Date.now() - new Date(createdAt)) / (1000 * 60 * 60 * 24);
           if (ageDays < 14) setSelectedDays(7);
         }
@@ -247,6 +262,12 @@ function DashboardPage() {
       setFetching(true);
     }
     setError('');
+
+    // Remember the chosen range so a refresh doesn't reset it back to default.
+    localStorage.setItem('rb_dashboard_date_mode', dateMode);
+    localStorage.setItem('rb_dashboard_days', String(selectedDays));
+    localStorage.setItem('rb_dashboard_range_start', rangeStart || '');
+    localStorage.setItem('rb_dashboard_range_end', rangeEnd || '');
 
     const load = async () => {
       try {

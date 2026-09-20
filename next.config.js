@@ -5,6 +5,13 @@ const withPWA = require('next-pwa')({
   register: true,
   skipWaiting: true,
   buildExcludes: [/dynamic-css-manifest\.json$/, /middleware-manifest\.json$/, /app-build-manifest\.json$/],
+  // next-pwa auto-generates public/sw.js at build time, silently overwriting
+  // any hand-written service worker at that path -- our push notification
+  // handlers were being wiped out on every deploy. importScripts pulls in
+  // push-sw.js (a separate file next-pwa doesn't touch) so the generated
+  // service worker still gets our push/notificationclick handling without
+  // needing to replace next-pwa's own precaching setup.
+  importScripts: ['/push-sw.js'],
 });
 
 const nextConfig = {

@@ -828,6 +828,11 @@ function CustomersPage() {
   const [activeTab,    setActiveTab]    = useState('all');
   const [sort,         setSort]         = useState('newest');
   const [sortMenuOpen,  setSortMenuOpen]  = useState(false);
+  const [sortMenuView,  setSortMenuView]  = useState('main'); // 'main' | 'segments'
+  const [tagFilter,     setTagFilter]     = useState('');
+  const [customTags,        setCustomTags]        = useState([]);
+  const [customTagsLoaded,  setCustomTagsLoaded]   = useState(false);
+  const [customTagsLoading, setCustomTagsLoading]  = useState(false);
   const [tabCounts,    setTabCounts]    = useState({ all: 0, active: 0, inactive: 0 });
   const [countsReady,  setCountsReady]  = useState(false);
   const [loading,      setLoading]      = useState(true);
@@ -897,6 +902,7 @@ function CustomersPage() {
       const params = new URLSearchParams({ page, limit: LIMIT, sort });
       if (search)              params.set('search', search);
       if (activeTab !== 'all') params.set('status', activeTab);
+      if (tagFilter)           params.set('tag', tagFilter);
       const { data } = await api.get('/customers?' + params.toString());
       setCustomers(data.data ?? []);
       setTotal(data.total ?? 0);
@@ -905,12 +911,27 @@ function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab, sort]);
+  }, [page, search, activeTab, sort, tagFilter]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleTabChange = (key) => { setActiveTab(key); setPage(1); };
   const handleSearch    = (val) => { setSearch(val);    setPage(1); };
+
+  const openSegmentsView = async () => {
+    setSortMenuView('segments');
+    if (customTagsLoaded) return;
+    setCustomTagsLoading(true);
+    try {
+      const { data } = await api.get('/customers/tags');
+      setCustomTags(data.data || []);
+    } catch {
+      setCustomTags([]);
+    } finally {
+      setCustomTagsLoading(false);
+      setCustomTagsLoaded(true);
+    }
+  };
 
   const handleDeleted = (customer) => {
     setCustomers(prev => prev.filter(c => c._id !== customer._id));
@@ -1021,16 +1042,17 @@ function CustomersPage() {
       )}
 
       <div className="mb-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Customers</h1>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h1 className="text-xl font-bold text-gray-900 shrink-0">Customers</h1>
+          <div className="flex items-center gap-2 shrink-0">
             <div className="relative">
               <button
                 onClick={function() { setDataMenuOpen(function(v) { return !v; }); }}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors"
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 transition-colors"
               >
                 <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                {'Import / Export'}
+                <span className="hidden sm:inline">{'Import / Export'}</span>
+                <span className="sm:hidden">{'Import/Export'}</span>
               </button>
               {dataMenuOpen && (
                 <>
@@ -1103,32 +1125,99 @@ function CustomersPage() {
           </button>
           {sortMenuOpen && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setSortMenuOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-20">
-                {[
-                  { key: 'newest',    label: 'Newest first' },
-                  { key: 'qr',        label: 'QR Signups First' },
-                  { key: 'oldest',    label: 'Oldest first' },
-                  { key: 'name_asc',  label: 'Name A-Z' },
-                  { key: 'name_desc', label: 'Name Z-A' },
-                ].map(function(opt) {
-                  return (
+              <div className="fixed inset-0 z-10" onClick={() => { setSortMenuOpen(false); setSortMenuView('main'); }} />
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-20">
+                {sortMenuView === 'main' ? (
+                  <>
+                    {[
+                      { key: 'newest',    label: 'Newest first' },
+                      { key: 'qr',        label: 'QR Signups First' },
+                      { key: 'oldest',    label: 'Oldest first' },
+                      { key: 'name_asc',  label: 'Name A-Z' },
+                      { key: 'name_desc', label: 'Name Z-A' },
+                    ].map(function(opt) {
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => { setSort(opt.key); setTagFilter(''); setPage(1); setSortMenuOpen(false); }}
+                          className={'w-full text-left px-4 py-2.5 text-sm transition-colors ' +
+                            (sort === opt.key && !tagFilter ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
                     <button
-                      key={opt.key}
                       type="button"
-                      onClick={() => { setSort(opt.key); setPage(1); setSortMenuOpen(false); }}
-                      className={'w-full text-left px-4 py-2.5 text-sm transition-colors ' +
-                        (sort === opt.key ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
+                      onClick={function() { openSegmentsView(); }}
+                      className={'w-full flex items-center justify-between px-4 py-2.5 text-sm border-t border-gray-100 transition-colors ' +
+                        (tagFilter ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
                     >
-                      {opt.label}
+                      <span>{tagFilter ? 'Segment: ' + tagLabel(tagFilter) : 'Segment'}</span>
+                      <span className="text-gray-400">{'\u203A'}</span>
                     </button>
-                  );
-                })}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSortMenuView('main')}
+                      className="w-full flex items-center gap-1.5 text-left px-4 py-2.5 text-xs font-semibold text-gray-400 hover:text-gray-600 border-b border-gray-100 transition-colors"
+                    >
+                      <span>{'\u2039'}</span><span>Back</span>
+                    </button>
+                    {TAG_OPTIONS.map(function(t) {
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => { setTagFilter(t.key); setPage(1); setSortMenuOpen(false); setSortMenuView('main'); }}
+                          className={'w-full text-left px-4 py-2.5 text-sm transition-colors ' +
+                            (tagFilter === t.key ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                    {customTagsLoading && (
+                      <p className="px-4 py-2.5 text-xs text-gray-400">Loading...</p>
+                    )}
+                    {!customTagsLoading && customTags.length > 0 && (
+                      <div className="border-t border-gray-100">
+                        {customTags.map(function(ct) {
+                          return (
+                            <button
+                              key={ct}
+                              type="button"
+                              onClick={() => { setTagFilter(ct); setPage(1); setSortMenuOpen(false); setSortMenuView('main'); }}
+                              className={'w-full text-left px-4 py-2.5 text-sm transition-colors ' +
+                                (tagFilter === ct ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-600 hover:bg-gray-50')}
+                            >
+                              {ct}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
+
+      {tagFilter && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className={'inline-flex items-center gap-1.5 text-xs font-semibold pl-3 pr-2 py-1 rounded-full border ' + tagStyle(tagFilter)}>
+            {'Showing: ' + tagLabel(tagFilter)}
+            <button type="button" onClick={() => { setTagFilter(''); setPage(1); }} className="hover:opacity-60">
+              {'\u2715'}
+            </button>
+          </span>
+        </div>
+      )}
 
       <div className="flex border-b border-gray-200 mb-4">
         {TABS.map(tab => (

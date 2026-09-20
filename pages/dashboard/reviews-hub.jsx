@@ -66,7 +66,7 @@ function ReviewsHubPage() {
         <HubCard
           href="/dashboard/reviews"
           icon={'\u2605'}
-          title="Reviews"
+          title="Google Reviews"
           description="See the reviews you've received"
         />
         <HubCard
