@@ -1,14 +1,14 @@
-﻿/**
+/**
  * context/AuthContext.jsx
  *
  * Global auth state for the entire app.
  *
  * Provides:
- *   user          -- { id, name, email, role, business_id, must_change_password } | null
- *   token         -- current access token string | null
- *   isLoading     -- true while we're checking session on first load
- *   login(data)   -- call after a successful POST /auth/login response
- *   logout()      -- clears state, calls POST /auth/logout, redirects to /login
+ *   user          â€” { id, name, email, role, business_id, must_change_password } | null
+ *   token         â€” current access token string | null
+ *   isLoading     â€” true while we're checking session on first load
+ *   login(data)   â€” call after a successful POST /auth/login response
+ *   logout()      â€” clears state, calls POST /auth/logout, redirects to /login
  *
  * On mount: calls POST /auth/refresh to restore session from the httpOnly cookie.
  * This is how the frontend "remembers" the user across page refreshes.
@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
   const [token,     setToken]     = useState(null);
   const [isLoading, setIsLoading] = useState(true);  // true until first refresh attempt completes
 
-  // -- Restore session from httpOnly cookie on first load --
+  // â”€â”€ Restore session from httpOnly cookie on first load  -- 
   useEffect(() => {
     const restoreSession = async () => {
       // Don't attempt refresh if account is flagged as suspended (prevents redirect loop)
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
         setToken(data.token);
         setUser(data.user);
       } catch {
-        // No valid cookie -- user is logged out, that's fine
+        // No valid cookie â†’ user is logged out, that's fine
         clearApiToken();
         setUser(null);
         setToken(null);
@@ -53,19 +53,19 @@ export function AuthProvider({ children }) {
     restoreSession();
   }, []);
 
-  // -- login: called after POST /auth/login succeeds --
+  // â”€â”€ login: called after POST /auth/login succeeds  -- 
   const login = useCallback((responseData) => {
     setApiToken(responseData.token);
     setToken(responseData.token);
     setUser(responseData.user);
   }, []);
 
-  // -- logout: clear state, revoke server-side token, redirect --
+  // â”€â”€ logout: clear state, revoke server-side token, redirect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
     } catch {
-      // Ignore -- cookie will expire naturally
+      // Ignore â€” cookie will expire naturally
     } finally {
       clearApiToken();
       setToken(null);
@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
     }
   }, [router]);
 
-  // -- Update user in state (e.g. after change-password sets must_change_password:false) --
+  // â”€â”€ Update user in state (e.g. after change-password sets must_change_password:false) â”€â”€
   const updateUser = useCallback((partial) => {
     setUser((prev) => prev ? { ...prev, ...partial } : prev);
   }, []);
@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// -- Hook --
+// â”€â”€ Hook  -- 
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

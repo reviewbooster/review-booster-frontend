@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import QRCode from 'react-qr-code';
 import api from '../lib/api';
+import { isStandalonePWA } from '../lib/waLink';
 
 function daysLeft(dateStr) {
   if (!dateStr) return null;
@@ -88,7 +89,11 @@ function PaymentModal({ plan, onClose }) {
     var url = number
       ? 'https://wa.me/' + number + '?text=' + encodeURIComponent(msg)
       : 'https://wa.me/?text=' + encodeURIComponent(msg);
-    window.open(url, '_blank');
+    if (isStandalonePWA()) {
+      window.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
   }
 
   return (

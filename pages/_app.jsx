@@ -1,8 +1,9 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import '../styles/globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { useRouter } from 'next/router';
 import CookieConsent from '../components/CookieConsent';
+import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import { trackPageview } from '../lib/analytics';
 
 /**
@@ -79,6 +80,7 @@ export default function App({ Component, pageProps }) {
       <GlobalModalScrollLock />
       <PageviewTracker />
       <CookieConsent />
+      <PushPermissionPrompt />
       <Component {...pageProps} />
     </AuthProvider>
   );

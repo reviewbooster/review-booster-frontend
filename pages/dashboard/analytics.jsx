@@ -299,6 +299,36 @@ function DashboardPage() {
 
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
+        {/* Summary strip -- headline numbers before the detailed funnel/chart below */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+          <div className="grid grid-cols-4 divide-x divide-gray-100">
+            <div className="px-3 md:px-4 py-3">
+              <p className="text-[10px] text-gray-400 mb-1 leading-none">Requests Sent</p>
+              <p className="text-base md:text-lg font-bold text-gray-900 tabular-nums leading-none">{total}</p>
+            </div>
+            <div className="px-3 md:px-4 py-3">
+              <p className="text-[10px] text-gray-400 mb-1 leading-none">Reviews Collected</p>
+              <p className="text-base md:text-lg font-bold text-gray-900 tabular-nums leading-none">{summary?.total_reviews ?? 0}</p>
+            </div>
+            <div className="px-3 md:px-4 py-3">
+              <p className="text-[10px] text-gray-400 mb-1 leading-none">Google Reviews</p>
+              <div className="flex items-baseline gap-1">
+                <p className="text-base md:text-lg font-bold text-gray-900 tabular-nums leading-none">{summary?.total_public ?? 0}</p>
+                <p className="text-[10px] text-gray-400">{calcPct(summary?.total_public) + '%'}</p>
+              </div>
+            </div>
+            <div className="px-3 md:px-4 py-3">
+              <p className="text-[10px] text-gray-400 mb-1 leading-none">Average Rating</p>
+              <div className="flex items-baseline gap-1">
+                <p className="text-base md:text-lg font-bold text-gray-900 tabular-nums leading-none">
+                  {summary?.avg_rating ? summary.avg_rating.toFixed(1) : '\u2014'}
+                </p>
+                <span style={{ color: '#FBBF24', fontSize: '13px' }}>{'\u2605'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Funnel + Chart */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

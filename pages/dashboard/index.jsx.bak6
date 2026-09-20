@@ -59,7 +59,7 @@ function MiniCard({ icon, iconBg, label, value, trend, trendSuffix, isTrialCard 
       </div>
       <p className="text-[22px] font-bold text-gray-900 leading-none tabular-nums text-center">{value}</p>
       {isTrialCard ? (
-        <Link href="/dashboard/settings/billing" className="text-[10px] font-semibold leading-none text-center text-purple-600 hover:text-purple-700">
+        <Link href="/dashboard/settings" className="text-[10px] font-semibold leading-none text-center text-purple-600 hover:text-purple-700">
           {'Upgrade plan \u2192'}
         </Link>
       ) : trend != null ? (
@@ -335,7 +335,7 @@ function DashboardPage() {
             {'Add your Google Review link to enable redirects'}
           </p>
           <Link
-            href="/dashboard/settings/business-profile"
+            href="/dashboard/settings"
             className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
           >
             Set it up
@@ -469,7 +469,7 @@ function DashboardPage() {
         {businessPlan === 'trial' && trialDaysLeft !== null && (
           <p className="text-[11px] text-purple-600 font-medium mt-2.5">
             {'Trial ends in ' + trialDaysLeft + ' day' + (trialDaysLeft === 1 ? '' : 's') + ' \u00b7 '}
-            <Link href="/dashboard/settings/billing" className="underline hover:text-purple-700">Upgrade plan</Link>
+            <Link href="/dashboard/settings" className="underline hover:text-purple-700">Upgrade plan</Link>
           </p>
         )}
       </div>

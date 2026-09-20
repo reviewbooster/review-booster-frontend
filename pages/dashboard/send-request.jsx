@@ -13,6 +13,7 @@ import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StaffPicker from '../../components/StaffPicker';
 import { getDefaultTemplates } from '../../lib/defaultMessageTemplates';
+import { waLinkProps } from '../../lib/waLink';
 
 var DEFAULT_REVIEW_TEMPLATE = 'Hi {{name}}, please take a moment to share your feedback. It only takes 30 seconds!\n\n{{link}}';
 
@@ -225,7 +226,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
                 </div>
               </div>
               <a href={buildPrefilledLink(result.channel, customer, result.reviewUrl, template)}
-                target="_blank" rel="noopener noreferrer"
+                {...waLinkProps()}
                 className="btn-primary w-full flex items-center justify-center">
                 {'Open ' + CHANNEL_META[result.channel].label}
               </a>
@@ -252,7 +253,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
                         <span key={ch} className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-100 text-gray-300 text-center">{meta.label}</span>
                       ) : (
                         <a key={ch} href={buildPrefilledLink(ch, customer, result.reviewUrl, template)}
-                          target="_blank" rel="noopener noreferrer"
+                          {...waLinkProps()}
                           className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors duration-150 text-center">
                           {meta.label}
                         </a>
@@ -385,7 +386,7 @@ function SendRequestPage() {
                   {c.email && <p className="text-[11px] text-gray-400">{c.email}</p>}
                 </div>
                 {c.opted_out ? (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 shrink-0">Inactive</span>
+                  <span title="Opted out -- will not receive review requests" className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 shrink-0">Inactive</span>
                 ) : (
                   <span className="text-purple-400 shrink-0">{'\u2192'}</span>
                 )}

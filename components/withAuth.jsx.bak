@@ -1,4 +1,4 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
 
@@ -13,13 +13,6 @@ export default function withAuth(WrappedPage, options = {}) {
       if (isLoading) return;
       if (!isAuthenticated) { router.replace("/login"); return; }
       if (user?.must_change_password) { router.replace("/change-password"); return; }
-
-      // New businesses land here until they finish (or skip) the post-signup
-      // setup wizard -- exempts /onboarding itself to avoid a redirect loop.
-      if (user?.onboarding_completed === false && !router.pathname.startsWith("/onboarding")) {
-        router.replace("/onboarding");
-        return;
-      }
 
       // Super admin belongs only in the admin panel
       const superAdminPaths = ["/dashboard/admin", "/dashboard/requests"];
@@ -46,7 +39,6 @@ export default function withAuth(WrappedPage, options = {}) {
     }
 
     if (!isAuthenticated || user?.must_change_password) return null;
-    if (user?.onboarding_completed === false && !router.pathname.startsWith("/onboarding")) return null;
     const superAdminPaths = ["/dashboard/admin", "/dashboard/requests"];
     if (user?.role === "super_admin" && !superAdminPaths.some(p => router.pathname.startsWith(p))) return null;
     if (requiredRole && user?.role !== requiredRole && user?.role !== "super_admin") return null;

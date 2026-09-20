@@ -1,7 +1,8 @@
-/**
+﻿/**
  * pages/dashboard/settings-hub.jsx
  * Settings hub -- landing page for the Settings section of the nav.
- * Cards out to Team and Settings (both owner-only, matching prior nav behaviour).
+ * Cards out to each settings category page, plus Referrals (lives under
+ * Growth already) and Team (owner-only).
  */
 
 import Link from 'next/link';
@@ -35,28 +36,54 @@ function SettingsHubPage() {
     <DashboardLayout>
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900 leading-tight">Settings</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">Manage your team and business settings.</p>
+        <p className="text-[13px] text-gray-400 mt-0.5">Manage your business profile and account</p>
       </div>
-      {isStaff ? (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
-          <p className="text-sm text-gray-500">Settings are managed by the business owner.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <HubCard
+          href="/dashboard/settings/business-profile"
+          icon={'\uD83C\uDFEA'}
+          title="Business Profile"
+          description="Name, photo, type, Google link"
+        />
+        <HubCard
+          href="/dashboard/settings/message-templates"
+          icon={'\uD83D\uDCAC'}
+          title="Message Templates"
+          description="Review requests, thank-yous, follow-ups"
+        />
+        <HubCard
+          href="/dashboard/settings/review-settings"
+          icon={'\u2699'}
+          title="Review Settings"
+          description="Workflow & customer consent"
+        />
+        <HubCard
+          href="/dashboard/referrals"
+          icon={'\uD83C\uDF81'}
+          title="Referrals & Rewards"
+          description="Manage your referral program"
+        />
+        <HubCard
+          href="/dashboard/settings/billing"
+          icon={'\uD83D\uDCB3'}
+          title="Plan & Billing"
+          description="Current plan, upgrade, payment"
+        />
+        <HubCard
+          href="/dashboard/settings/account-security"
+          icon={'\uD83D\uDD10'}
+          title="Account & Security"
+          description="Password, sign out, account info"
+        />
+        {!isStaff && (
           <HubCard
             href="/dashboard/team"
             icon={'\uD83D\uDC65'}
             title="Team"
             description="Manage staff accounts and roles"
           />
-          <HubCard
-            href="/dashboard/settings"
-            icon={'\u2699'}
-            title="Settings"
-            description="Business profile, billing, and preferences"
-          />
-        </div>
-      )}
+        )}
+      </div>
     </DashboardLayout>
   );
 }

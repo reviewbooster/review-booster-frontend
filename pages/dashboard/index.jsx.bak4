@@ -59,7 +59,7 @@ function MiniCard({ icon, iconBg, label, value, trend, trendSuffix, isTrialCard 
       </div>
       <p className="text-[22px] font-bold text-gray-900 leading-none tabular-nums text-center">{value}</p>
       {isTrialCard ? (
-        <Link href="/dashboard/settings/billing" className="text-[10px] font-semibold leading-none text-center text-purple-600 hover:text-purple-700">
+        <Link href="/dashboard/settings" className="text-[10px] font-semibold leading-none text-center text-purple-600 hover:text-purple-700">
           {'Upgrade plan \u2192'}
         </Link>
       ) : trend != null ? (
@@ -335,7 +335,7 @@ function DashboardPage() {
             {'Add your Google Review link to enable redirects'}
           </p>
           <Link
-            href="/dashboard/settings/business-profile"
+            href="/dashboard/settings"
             className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
           >
             Set it up
@@ -469,7 +469,7 @@ function DashboardPage() {
         {businessPlan === 'trial' && trialDaysLeft !== null && (
           <p className="text-[11px] text-purple-600 font-medium mt-2.5">
             {'Trial ends in ' + trialDaysLeft + ' day' + (trialDaysLeft === 1 ? '' : 's') + ' \u00b7 '}
-            <Link href="/dashboard/settings/billing" className="underline hover:text-purple-700">Upgrade plan</Link>
+            <Link href="/dashboard/settings" className="underline hover:text-purple-700">Upgrade plan</Link>
           </p>
         )}
       </div>
@@ -520,49 +520,6 @@ function DashboardPage() {
           </div>
           <span className="ml-auto text-[11px] font-semibold text-purple-600 shrink-0">View Referrals {'\u2192'}</span>
         </Link>
-
-        {/* Quick Actions -- one card, a few compact rows, not a card each */}
-        <p className="text-sm font-bold text-gray-800 mt-5 mb-2">Quick Actions</p>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-          <Link href="/dashboard/reviews" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">View Reviews</p>
-              <p className="text-[11px] text-gray-400">See customer feedback</p>
-            </div>
-            <span className="text-gray-300 shrink-0">{'\u2192'}</span>
-          </Link>
-          <Link href="/dashboard/feedback" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <path d="M4 22v-7" strokeLinecap="round" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">Check Private Feedback</p>
-              <p className="text-[11px] text-gray-400">
-                {unresolvedCount > 0 ? unresolvedCount + ' need attention' : 'All caught up'}
-              </p>
-            </div>
-            {unresolvedCount > 0 && (
-              <span className="shrink-0 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {unresolvedCount > 99 ? '99+' : unresolvedCount}
-              </span>
-            )}
-          </Link>
-          <Link href="/dashboard/analytics" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
-              <path d="M15 7h6v6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">View Analytics</p>
-              <p className="text-[11px] text-gray-400">Track your growth</p>
-            </div>
-            <span className="text-gray-300 shrink-0">{'\u2192'}</span>
-          </Link>
-        </div>
       </div>
     </DashboardLayout>
   );
