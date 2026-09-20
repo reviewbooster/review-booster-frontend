@@ -1265,43 +1265,33 @@ function CustomersPage() {
             <div
               key={c._id}
               onClick={() => router.push('/dashboard/customers/' + c._id)}
-              className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100 cursor-pointer"
+              className="flex flex-col gap-1.5 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100 cursor-pointer"
             >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                style={{ backgroundColor: avatarBg((page - 1) * LIMIT + i) }}
-              >
-                {c.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
-                  {c.tags && c.tags.indexOf('referral') !== -1 && (
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 shrink-0">
-                      Referred
-                    </span>
-                  )}
-                  {c.tags && c.tags.filter(function(t) { return t !== 'referral'; }).map(function(t) {
-                    return (
-                      <span key={t} className={'text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ' + tagStyle(t)}>
-                        {tagLabel(t)}
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                  style={{ backgroundColor: avatarBg((page - 1) * LIMIT + i) }}
+                >
+                  {c.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                    {c.tags && c.tags.indexOf('referral') !== -1 && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 shrink-0">
+                        Referred
                       </span>
-                    );
-                  })}
+                    )}
+                    {c.tags && c.tags.filter(function(t) { return t !== 'referral'; }).map(function(t) {
+                      return (
+                        <span key={t} className={'text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ' + tagStyle(t)}>
+                          {tagLabel(t)}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                {c.phone && <p className="text-[11px] text-gray-400 mt-0.5">{c.phone}</p>}
-                {c.email && <p className="text-[11px] text-gray-400">{c.email}</p>}
-              </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <div className="flex flex-col items-end gap-1 mr-2 shrink-0">
-                  <span
-                    title={c.opted_out ? 'Opted out -- will not receive review requests' : undefined}
-                    className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' +
-                    (c.opted_out ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600')}>
-                    {c.opted_out ? 'Inactive' : 'Active'}
-                  </span>
-                  <span className="text-[10px] text-gray-400">{timeAgo(c.added_at)}</span>
-                </div>
+                <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   onClick={e => { e.stopPropagation(); setSendTarget(c); }}
                   disabled={c.opted_out}
@@ -1343,6 +1333,21 @@ function CustomersPage() {
                     )}
                   </div>
                 )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2 pl-[52px]">
+                <p className="text-[11px] text-gray-400 truncate min-w-0">
+                  {[c.phone, c.email].filter(Boolean).join('  \u00b7  ')}
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    title={c.opted_out ? 'Opted out -- will not receive review requests' : undefined}
+                    className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' +
+                    (c.opted_out ? 'bg-gray-100 text-gray-400' : 'bg-green-50 text-green-600')}>
+                    {c.opted_out ? 'Inactive' : 'Active'}
+                  </span>
+                  <span className="text-[10px] text-gray-400 whitespace-nowrap">{timeAgo(c.added_at)}</span>
+                </div>
               </div>
             </div>
           ))
