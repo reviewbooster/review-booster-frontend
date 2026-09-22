@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext';
 import StaffPicker from '../../components/StaffPicker';
 import { getDefaultTemplates } from '../../lib/defaultMessageTemplates';
 import { waLinkProps } from '../../lib/waLink';
+import { getNotesLabel } from '../../lib/industryFieldLabels';
 
 const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#0EA5E9'];
 function avatarBg(idx) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
@@ -22,7 +23,6 @@ function avatarBg(idx) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 var TAG_OPTIONS = [
   { key: 'vip',       label: 'VIP',       style: 'bg-amber-50 text-amber-700 border-amber-200' },
   { key: 'frequent',  label: 'Frequent',  style: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { key: 'follow-up', label: 'Follow-up', style: 'bg-purple-50 text-purple-700 border-purple-200' },
 ];
 function tagLabel(key) {
   var found = TAG_OPTIONS.filter(function(t) { return t.key === key; })[0];
@@ -191,7 +191,7 @@ function AddCustomerModal({ onClose, onCreated }) {
 }
 
 // -- Edit Customer Modal -------------------------------------------------------
-function EditCustomerModal({ customer, onClose, onUpdated }) {
+function EditCustomerModal({ customer, businessType, onClose, onUpdated }) {
   const [form, setForm] = useState({
     name:      customer.name      || '',
     phone:     customer.phone     || '',
@@ -269,11 +269,11 @@ function EditCustomerModal({ customer, onClose, onUpdated }) {
               value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
           </div>
           <div>
-            <label className="label">Notes</label>
+            <label className="label">{getNotesLabel(businessType).label}</label>
             <textarea
               className="input resize-none"
               rows={3}
-              placeholder="Any notes about this customer..."
+              placeholder={getNotesLabel(businessType).placeholder}
               value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
             ></textarea>
@@ -830,10 +830,12 @@ function CustomersPage() {
   const [sortMenuOpen,  setSortMenuOpen]  = useState(false);
   const [sortMenuView,  setSortMenuView]  = useState('main'); // 'main' | 'segments'
   const [tagFilter,     setTagFilter]     = useState('');
+  const [followupFilter, setFollowupFilter] = useState(false);
+  const [businessType,  setBusinessType]  = useState(null);
   const [customTags,        setCustomTags]        = useState([]);
   const [customTagsLoaded,  setCustomTagsLoaded]   = useState(false);
   const [customTagsLoading, setCustomTagsLoading]  = useState(false);
-  const [tabCounts,    setTabCounts]    = useState({ all: 0, active: 0, inactive: 0 });
+  const [tabCounts,    setTabCounts]    = useState({ all: 0, vip: 0, followup: 0, inactive: 0 });
   const [countsReady,  setCountsReady]  = useState(false);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState('');
@@ -885,15 +887,23 @@ function CustomersPage() {
   const refreshCounts = useCallback(() => {
     Promise.all([
       api.get('/customers?limit=1'),
-      api.get('/customers?limit=1&status=active'),
+      api.get('/customers?limit=1&tag=vip'),
+      api.get('/customers?limit=1&due_followup=true'),
       api.get('/customers?limit=1&status=inactive'),
-    ]).then(([a, b, c]) => {
-      setTabCounts({ all: a.data.total || 0, active: b.data.total || 0, inactive: c.data.total || 0 });
+    ]).then(([a, b, c, d]) => {
+      setTabCounts({ all: a.data.total || 0, vip: b.data.total || 0, followup: c.data.total || 0, inactive: d.data.total || 0 });
       setCountsReady(true);
     }).catch(() => { setCountsReady(true); });
   }, []);
 
   useEffect(() => { refreshCounts(); }, [refreshCounts]);
+
+  useEffect(() => {
+    api.get('/business/my-settings').then(function(res) {
+      var biz = res.data && res.data.data;
+      if (biz && biz.type) setBusinessType(biz.type);
+    }).catch(function() {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -903,6 +913,7 @@ function CustomersPage() {
       if (search)              params.set('search', search);
       if (activeTab !== 'all') params.set('status', activeTab);
       if (tagFilter)           params.set('tag', tagFilter);
+      if (followupFilter)      params.set('due_followup', 'true');
       const { data } = await api.get('/customers?' + params.toString());
       setCustomers(data.data ?? []);
       setTotal(data.total ?? 0);
@@ -911,11 +922,17 @@ function CustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, activeTab, sort, tagFilter]);
+  }, [page, search, activeTab, sort, tagFilter, followupFilter]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleTabChange = (key) => { setActiveTab(key); setPage(1); };
+  const handleTabChange = (key) => {
+    if (key === 'all')      { setActiveTab('all');      setTagFilter(''); setFollowupFilter(false); }
+    else if (key === 'vip') { setActiveTab('all');       setTagFilter('vip'); setFollowupFilter(false); }
+    else if (key === 'followup') { setActiveTab('all');  setTagFilter(''); setFollowupFilter(true); }
+    else if (key === 'inactive') { setActiveTab('inactive'); setTagFilter(''); setFollowupFilter(false); }
+    setPage(1);
+  };
   const handleSearch    = (val) => { setSearch(val);    setPage(1); };
 
   const openSegmentsView = async () => {
@@ -979,10 +996,12 @@ function CustomersPage() {
   const totalPages = Math.ceil(total / LIMIT);
 
   const TABS = [
-    { key: 'all',      label: 'All',      count: tabCounts.all },
-    { key: 'active',   label: 'Active',   count: tabCounts.active },
-    { key: 'inactive', label: 'Inactive', count: tabCounts.inactive },
+    { key: 'all',      label: 'All',       count: tabCounts.all },
+    { key: 'vip',      label: 'VIP',       count: tabCounts.vip },
+    { key: 'followup', label: 'Follow-up', count: tabCounts.followup },
+    { key: 'inactive', label: 'Inactive',  count: tabCounts.inactive },
   ];
+  const activeTabKey = tagFilter === 'vip' ? 'vip' : followupFilter ? 'followup' : activeTab === 'inactive' ? 'inactive' : 'all';
 
   return (
     <DashboardLayout>
@@ -1020,6 +1039,7 @@ function CustomersPage() {
       {editTarget && (
         <EditCustomerModal
           customer={editTarget}
+          businessType={businessType}
           onClose={() => setEditTarget(null)}
           onUpdated={handleUpdated} />
       )}
@@ -1098,6 +1118,19 @@ function CustomersPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div>
+          <p className="text-2xl font-bold text-gray-900">{countsReady ? tabCounts.all.toLocaleString() : '\u2014'}</p>
+          <p className="text-xs text-gray-400">Total customers</p>
+        </div>
+        <button
+          onClick={() => router.push('/dashboard/follow-ups')}
+          className="text-right hover:opacity-70 transition-opacity">
+          <p className="text-2xl font-bold text-orange-500">{countsReady ? tabCounts.followup.toLocaleString() : '\u2014'}</p>
+          <p className="text-xs text-gray-400 underline decoration-dotted">Need follow-up</p>
+        </button>
       </div>
 
       <div className="flex gap-2 mb-4">
@@ -1208,7 +1241,7 @@ function CustomersPage() {
         </div>
       </div>
 
-      {tagFilter && (
+      {tagFilter && tagFilter !== 'vip' && tagFilter !== 'follow-up' && (
         <div className="flex items-center gap-2 mb-3">
           <span className={'inline-flex items-center gap-1.5 text-xs font-semibold pl-3 pr-2 py-1 rounded-full border ' + tagStyle(tagFilter)}>
             {'Showing: ' + tagLabel(tagFilter)}
@@ -1219,17 +1252,17 @@ function CustomersPage() {
         </div>
       )}
 
-      <div className="flex border-b border-gray-200 mb-4">
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto">
         {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => handleTabChange(tab.key)}
-            className={'pb-3 mr-5 text-sm font-semibold border-b-2 -mb-px transition-colors duration-150 ' +
-              (activeTab === tab.key
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-400 hover:text-gray-600')}
+            className={'shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors duration-150 border ' +
+              (activeTabKey === tab.key
+                ? 'bg-purple-600 border-purple-600 text-white'
+                : 'bg-white border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600')}
           >
-            {tab.label + (countsReady ? ' (' + tab.count.toLocaleString() + ')' : '')}
+            {tab.label + (countsReady ? ' ' + tab.count.toLocaleString() : '')}
           </button>
         ))}
       </div>
@@ -1303,17 +1336,6 @@ function CustomersPage() {
                   </svg>
                 </button>
                 {!isStaff && (
-                  <button
-                    onClick={e => { e.stopPropagation(); setDeleteTarget(c); }}
-                    title="Delete Customer"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 transition-colors"
-                  >
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
-                {!isStaff && (
                   <div className="relative">
                     <button
                       onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === c._id ? null : c._id); }}
@@ -1328,6 +1350,12 @@ function CustomersPage() {
                           className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteTarget(c); setMenuOpenId(null); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          Delete
                         </button>
                       </div>
                     )}
