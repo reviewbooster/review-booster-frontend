@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/feedback.jsx
  * Private Feedback page -- status tracking, urgency badges, tags, staff
  * assignment, AI reply suggestions, and a resolution trail (who resolved
@@ -29,6 +29,11 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function fmtDateTime(d) {
+  if (!d) return '\u2014';
+  return new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
 function sourceLabel(src) {
   var map = { whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email', qr: 'QR Code' };
   return map[src] || src || 'Unknown';
@@ -39,6 +44,38 @@ function getStatus(r) {
   if (r.stage === 'processing') return 'Processing';
   if (r.stage === 'awaiting_confirmation') return 'Awaiting Confirmation';
   return 'New';
+}
+
+// Private feedback is always 1-3 stars, so this only ever resolves to one of
+// two labels -- derived from the rating already on the record, no guessing.
+function getSentiment(rating) {
+  if (rating <= 2) return 'Negative';
+  if (rating === 3) return 'Neutral';
+  return null;
+}
+
+function SentimentBadge({ rating }) {
+  var sentiment = getSentiment(rating);
+  if (!sentiment) return null;
+  var styles = { 'Negative': 'bg-red-50 text-red-500', 'Neutral': 'bg-amber-50 text-amber-600' };
+  return (
+    <span className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (styles[sentiment] || 'bg-gray-100 text-gray-500')}>
+      {sentiment}
+    </span>
+  );
+}
+
+// Static reply-draft templates (see Section 4 description) -- picking one
+// calls /reviews/:id/generate-reply with { template: <key> }; no external API.
+var TEMPLATE_OPTIONS = [
+  { key: 'apologize',      label: '\uD83D\uDE14 Apologize' },
+  { key: 'thank',          label: '\uD83D\uDC99 Thank Them' },
+  { key: 'ask_details',    label: '\u2753 Ask for Details' },
+  { key: 'issue_resolved', label: '\u2705 Issue Resolved' },
+];
+
+function bucketOfStage(stage) {
+  return stage === 'new' ? 'new' : 'in_progress';
 }
 
 var STAGE_OPTIONS = [
@@ -149,10 +186,10 @@ function buildPages(page, total) {
 }
 
 // -- Detail / Reply modal -----------------------------------------------------
-function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onStageChange })  {
+function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onStageChange, onMarkSent })  {
   const [reply,  setReply]  = useState('');
   const [copied, setCopied] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
+  const [suggesting, setSuggesting] = useState(null); // null, or the template key currently loading
   const [suggestError, setSuggestError] = useState('');
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
@@ -160,6 +197,9 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
   const [resolvedBy, setResolvedBy] = useState(null);
   const [updatingStage, setUpdatingStage] = useState(false);
   const [resolvedFollowupTemplate, setResolvedFollowupTemplate] = useState('');
+  const [customerContext, setCustomerContext] = useState(null);
+  const [composingNew, setComposingNew] = useState(false);
+  const lastSentAtRef = useRef(item.reply_sent_at);
 
   useEffect(function() {
     api.get('/business/my-settings').then(function(res) {
@@ -172,6 +212,23 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
       }
     }).catch(function() {});
   }, []);
+
+  useEffect(function() {
+    api.get('/reviews/' + item._id + '/customer-context').then(function(res) {
+      setCustomerContext(res.data && res.data.data ? res.data.data : null);
+    }).catch(function() {});
+  }, [item._id]);
+
+  // Once a send actually lands (item.reply_sent_at changes because the
+  // parent refreshed it after mark-sent succeeded), collapse back out of
+  // "composing" mode so the sent-summary card takes over.
+  useEffect(function() {
+    if (item.reply_sent_at !== lastSentAtRef.current) {
+      lastSentAtRef.current = item.reply_sent_at;
+      setComposingNew(false);
+    }
+  }, [item.reply_sent_at]);
+
     const [notes, setNotes] = useState(item.internal_notes || '');
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesSaved, setNotesSaved] = useState(false);
@@ -203,13 +260,13 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
     });
   };
 
-  var handleSuggestReply = function() {
-    setSuggesting(true);
+  var handleSuggestReply = function(template) {
+    setSuggesting(template);
     setSuggestError('');
-    api.post('/reviews/' + item._id + '/generate-reply')
+    api.post('/reviews/' + item._id + '/generate-reply', { template: template })
       .then(function(res) { setReply(res.data?.data?.draft || ''); })
       .catch(function(err) { setSuggestError(err.response?.data?.error || 'Failed to generate a suggestion.'); })
-      .finally(function() { setSuggesting(false); });
+      .finally(function() { setSuggesting(null); });
   };
 
   var handleResend = function() {
@@ -266,6 +323,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
               <div className="flex items-center gap-2 flex-wrap mb-0.5">
                 <p className="text-sm font-semibold text-gray-900">{customerName}</p>
                 <StatusBadge status={status} />
+                <SentimentBadge rating={item.rating} />
                 <UrgencyBadge item={item} />
                 <TagBadges tags={item.tags} />
               </div>
@@ -295,6 +353,23 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
               )}
             </div>
           </div>
+
+          {/* Customer history -- only shown when we have real data to back it,
+              never a made-up number. Comes from customer-context, fetched
+              once when the modal opens (not on every list row). */}
+          {customer && customerContext && (customerContext.total_reviews > 0 || customerContext.customer_since) && (
+            <div className="flex items-center gap-3 text-[11px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-3 flex-wrap">
+              {customerContext.total_reviews > 0 && (
+                <span>{customerContext.total_reviews + ' total review' + (customerContext.total_reviews === 1 ? '' : 's')}</span>
+              )}
+              {customerContext.customer_since && (
+                <span>{'Customer since ' + fmtDate(customerContext.customer_since)}</span>
+              )}
+              {customerContext.last_contacted && (
+                <span>{'Last contacted ' + fmtDate(customerContext.last_contacted)}</span>
+              )}
+            </div>
+          )}
 
           {/* Their feedback */}
           <div className="bg-gray-50 rounded-xl p-4 mb-3">
@@ -326,43 +401,71 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
 
           {customer && (customer.phone || customer.email) ? (
             <div className="mb-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-gray-700">Your Reply</label>
-                {!isStaff && (
-                  <button
-                    onClick={handleSuggestReply}
-                    disabled={suggesting}
-                    className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-50 flex items-center gap-1">
-                    {suggesting ? <><span className='spinner' /> {'Generating\u2026'}</> : <>{'\u2736'} {'Suggest Reply'}</>}
-                  </button>
-                )}
-              </div>
-              {suggestError && <p className="text-[10px] text-red-500 mb-1.5">{suggestError}</p>}
-              <textarea
-                value={reply}
-                onChange={function(e) { setReply(e.target.value); }}
-                placeholder={'Hi ' + customerName + ', thank you for your feedback\u2026'}
-                rows={4}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all"
-              />
-              <div className="flex gap-2 mt-2">
-                {customer.phone && (
-                  <a href={'https://wa.me/' + customer.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(buildContextualMessage())} {...waLinkProps()} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
-                    WhatsApp
-                  </a>
-                )}
-                {customer.phone && (
-                  <a href={'sms:' + customer.phone + '?body=' + encodeURIComponent(buildContextualMessage())} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
-                    SMS
-                  </a>
-                )}
-                {customer.email && (
-                  <a href={'mailto:' + customer.email + '?subject=' + encodeURIComponent('Following up on your feedback') + '&body=' + encodeURIComponent(buildContextualMessage())} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
-                    Email
-                  </a>
-                )}
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5 text-center">{'Opens with your reply pre-filled.'}</p>
+              {item.reply_sent_at && !composingNew ? (
+                <div className="bg-green-50 rounded-xl p-3.5">
+                  <p className="text-[10px] text-green-700 font-semibold flex items-center gap-1 mb-1.5">
+                    <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {'Sent via ' + sourceLabel(item.reply_channel) + ' \u00b7 ' + fmtDateTime(item.reply_sent_at)}
+                  </p>
+                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {item.reply_text || '(Message text wasn\u2019t recorded for this one -- only replies sent after this update are saved.)'}
+                  </p>
+                  {!isStaff && status !== 'Resolved' && (
+                    <button type="button" onClick={function() { setComposingNew(true); }}
+                      className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 mt-2">
+                      {'Send another reply'}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Your Reply</label>
+                  {!isStaff && (
+                    <div className="flex gap-1.5 mb-2 flex-wrap">
+                      {TEMPLATE_OPTIONS.map(function(t) {
+                        return (
+                          <button
+                            key={t.key}
+                            type="button"
+                            onClick={function() { handleSuggestReply(t.key); }}
+                            disabled={!!suggesting}
+                            className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 disabled:opacity-50 flex items-center gap-1 transition-colors">
+                            {suggesting === t.key ? <><span className='spinner' /> {'\u2026'}</> : t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {suggestError && <p className="text-[10px] text-red-500 mb-1.5">{suggestError}</p>}
+                  <textarea
+                    value={reply}
+                    onChange={function(e) { setReply(e.target.value); }}
+                    placeholder={'Hi ' + customerName + ', thank you for your feedback\u2026'}
+                    rows={4}
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 text-gray-700 placeholder-gray-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition-all"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    {customer.phone && (
+                      <a href={'https://wa.me/' + customer.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(buildContextualMessage())} {...waLinkProps()} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'whatsapp', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                        WhatsApp
+                      </a>
+                    )}
+                    {customer.phone && (
+                      <a href={'sms:' + customer.phone + '?body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'sms', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                        SMS
+                      </a>
+                    )}
+                    {customer.email && (
+                      <a href={'mailto:' + customer.email + '?subject=' + encodeURIComponent('Following up on your feedback') + '&body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'email', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                        Email
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1.5 text-center">{'Opens with your reply pre-filled.'}</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="mb-5">
@@ -453,7 +556,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
 function FeedbackPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'staff';
-  const [activeTab,   setActiveTab]   = useState('unresolved');
+  const [activeTab,   setActiveTab]   = useState('new');
   const [items,       setItems]       = useState([]);
   const [total,       setTotal]       = useState(0);
   const [page,        setPage]        = useState(1);
@@ -471,8 +574,9 @@ function FeedbackPage() {
   const [loading,     setLoading]     = useState(true);
   const [fetching,    setFetching]    = useState(false);
   const [error,       setError]       = useState('');
-  const [counts,      setCounts]      = useState({ unresolved: 0, resolved: 0 });
+  const [counts,      setCounts]      = useState({ new: 0, in_progress: 0, resolved: 0 });
   const [countsReady, setCountsReady] = useState(false);
+  const [tagOptions,  setTagOptions]  = useState([]);
   const [resolving,   setResolving]   = useState(null);
   const [viewItem,    setViewItem]    = useState(null);
 
@@ -484,12 +588,23 @@ function FeedbackPage() {
 
   useEffect(function() {
     Promise.all([
-      api.get('/reviews/private?limit=1&is_resolved=false'),
+      api.get('/reviews/private?limit=1&is_resolved=false&stage=new'),
+      api.get('/reviews/private?limit=1&is_resolved=false&stage=in_progress'),
       api.get('/reviews/private?limit=1&is_resolved=true'),
     ]).then(function(results) {
-      setCounts({ unresolved: results[0].data.total || 0, resolved: results[1].data.total || 0 });
+      setCounts({
+        new:         results[0].data.total || 0,
+        in_progress: results[1].data.total || 0,
+        resolved:    results[2].data.total || 0,
+      });
       setCountsReady(true);
     }).catch(function() { setCountsReady(true); });
+  }, []);
+
+  useEffect(function() {
+    api.get('/reviews/tags').then(function(res) {
+      setTagOptions(res.data && res.data.data ? res.data.data : []);
+    }).catch(function() {});
   }, []);
 
   useEffect(function() {
@@ -527,12 +642,19 @@ function FeedbackPage() {
     }
     setError('');
     try {
-      var isResolved = activeTab === 'resolved' ? 'true' : 'false';
       var params = buildFilterParams();
       params.set('page', page);
       params.set('limit', LIMIT);
       params.set('sort', sort);
-      params.set('is_resolved', isResolved);
+      if (activeTab === 'resolved') {
+        params.set('is_resolved', 'true');
+      } else if (activeTab === 'new') {
+        params.set('is_resolved', 'false');
+        params.set('stage', 'new');
+      } else if (activeTab === 'in_progress') {
+        params.set('is_resolved', 'false');
+        params.set('stage', 'in_progress');
+      }
       var res = await api.get('/reviews/private?' + params.toString());
       setItems(res.data.data ?? []);
       setTotal(res.data.total ?? 0);
@@ -587,14 +709,69 @@ function FeedbackPage() {
   var handleStageChange = async function(id, stage) {
     try {
       await api.patch('/reviews/' + id + '/stage', { stage: stage });
+      var prevItem = items.find(function(r) { return r._id === id; }) || viewItem;
+      var oldBucket = bucketOfStage(prevItem ? (prevItem.stage || 'new') : 'new');
+      var newBucket = bucketOfStage(stage);
+
       setItems(function(prev) {
         return prev.map(function(r) { return r._id === id ? Object.assign({}, r, { stage: stage }) : r; });
       });
       setViewItem(function(prev) {
         return prev && prev._id === id ? Object.assign({}, prev, { stage: stage }) : prev;
       });
+
+      if (oldBucket !== newBucket) {
+        setCounts(function(prev) {
+          var next = Object.assign({}, prev);
+          next[oldBucket] = Math.max(0, next[oldBucket] - 1);
+          next[newBucket] = next[newBucket] + 1;
+          return next;
+        });
+        // If the item just moved out of the tab currently being viewed
+        // (New or In Progress), drop it from the visible list without a refetch.
+        if (activeTab === oldBucket) {
+          setItems(function(prev) { return prev.filter(function(r) { return r._id !== id; }); });
+          setTotal(function(t) { return Math.max(0, t - 1); });
+        }
+      }
     } catch (e) {
       // best-effort
+    }
+  };
+
+  var handleMarkSent = async function(id, channel, replyText) {
+    try {
+      var res = await api.patch('/reviews/' + id + '/mark-sent', { channel: channel, reply_text: replyText });
+      var updated = (res.data && res.data.data) || {};
+      var newStage = updated.stage || 'awaiting_confirmation';
+      var replySentAt = updated.reply_sent_at || new Date().toISOString();
+      var storedReplyText = updated.reply_text != null ? updated.reply_text : (replyText || null);
+
+      var prevItem = items.find(function(r) { return r._id === id; }) || viewItem;
+      var oldBucket = bucketOfStage(prevItem ? (prevItem.stage || 'new') : 'new');
+      var newBucket = bucketOfStage(newStage);
+
+      setItems(function(prev) {
+        return prev.map(function(r) { return r._id === id ? Object.assign({}, r, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }) : r; });
+      });
+      setViewItem(function(prev) {
+        return prev && prev._id === id ? Object.assign({}, prev, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }) : prev;
+      });
+
+      if (oldBucket !== newBucket) {
+        setCounts(function(prev) {
+          var next = Object.assign({}, prev);
+          next[oldBucket] = Math.max(0, next[oldBucket] - 1);
+          next[newBucket] = next[newBucket] + 1;
+          return next;
+        });
+        if (activeTab === oldBucket) {
+          setItems(function(prev) { return prev.filter(function(r) { return r._id !== id; }); });
+          setTotal(function(t) { return Math.max(0, t - 1); });
+        }
+      }
+    } catch (e) {
+      // best-effort -- the wa.me/sms/mailto link still opens even if this tracking call fails
     }
   };
 
@@ -602,10 +779,15 @@ function FeedbackPage() {
     setResolving(id);
     try {
       await api.patch('/reviews/' + id + '/resolve', resolvedBy ? { resolved_by: resolvedBy } : {});
+      var resolvedItem = items.find(function(r) { return r._id === id; }) || viewItem;
+      var bucket = bucketOfStage(resolvedItem ? (resolvedItem.stage || 'new') : 'new');
       setItems(function(prev) { return prev.filter(function(r) { return r._id !== id; }); });
       setTotal(function(t) { return Math.max(0, t - 1); });
       setCounts(function(prev) {
-        return { unresolved: Math.max(0, prev.unresolved - 1), resolved: prev.resolved + 1 };
+        var next = Object.assign({}, prev);
+        next[bucket] = Math.max(0, next[bucket] - 1);
+        next.resolved = next.resolved + 1;
+        return next;
       });
       setViewItem(null);
     } catch (e) {
@@ -623,8 +805,9 @@ function FeedbackPage() {
   var totalPages = Math.ceil(total / LIMIT);
 
   var TABS = [
-    { key: 'unresolved', label: 'Needs Attention', count: counts.unresolved },
-    { key: 'resolved',   label: 'Resolved',        count: counts.resolved   },
+    { key: 'new',         label: 'Unresolved',  count: counts.new },
+    { key: 'in_progress', label: 'In Progress', count: counts.in_progress },
+    { key: 'resolved',    label: 'Resolved',    count: counts.resolved },
   ];
 
   return (
@@ -637,7 +820,8 @@ function FeedbackPage() {
           onResolve={markResolved}
           resolving={resolving}
           isStaff={isStaff}
-          onStageChange={handleStageChange} />
+          onStageChange={handleStageChange}
+          onMarkSent={handleMarkSent} />
       )}
 
       {/* Tab bar */}
@@ -752,11 +936,9 @@ function FeedbackPage() {
                     onChange={function(e) { handleFilterChange('tag', e.target.value); }}
                     className="w-full bg-gray-100 rounded-lg px-2.5 py-1.5 text-[12px] text-gray-700 outline-none focus:ring-2 focus:ring-purple-200">
                     <option value="">All Categories</option>
-                    <option value="Staff">Staff</option>
-                    <option value="Wait Time">Wait Time</option>
-                    <option value="Pricing">Pricing</option>
-                    <option value="Cleanliness">Cleanliness</option>
-                    <option value="Quality">Quality</option>
+                    {tagOptions.map(function(t) {
+                      return <option key={t} value={t}>{t}</option>;
+                    })}
                   </select>
                 </div>
               </div>
@@ -853,12 +1035,12 @@ function FeedbackPage() {
           })
         ) : items.length === 0 ? (
           <div className="py-16 flex flex-col items-center text-center px-6">
-            <p className="text-4xl mb-3">{activeTab === 'unresolved' ? '\u2705' : '\u2713'}</p>
+            <p className="text-4xl mb-3">{activeTab === 'resolved' ? '\u2713' : '\u2705'}</p>
             <p className="text-sm font-semibold text-gray-700 mb-1">
-              {hasActiveFilters ? 'No matching feedback' : (activeTab === 'unresolved' ? 'All caught up!' : 'No resolved feedback yet')}
+              {hasActiveFilters ? 'No matching feedback' : (activeTab === 'resolved' ? 'No resolved feedback yet' : 'All caught up!')}
             </p>
             <p className="text-xs text-gray-400">
-              {hasActiveFilters ? 'Try adjusting your filters.' : (activeTab === 'unresolved' ? 'No unresolved feedback. Great work!' : 'Resolved items will appear here.')}
+              {hasActiveFilters ? 'Try adjusting your filters.' : (activeTab === 'resolved' ? 'Resolved items will appear here.' : 'No feedback needs attention right now.')}
             </p>
           </div>
         ) : (
@@ -880,6 +1062,7 @@ function FeedbackPage() {
                       {(r.customer_id && r.customer_id.name) ? r.customer_id.name : 'Anonymous'}
                     </p>
                     <StatusBadge status={status} />
+                    <SentimentBadge rating={r.rating} />
                     <UrgencyBadge item={r} />
                     <TagBadges tags={r.tags} />
                   </div>
