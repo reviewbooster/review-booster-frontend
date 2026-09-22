@@ -141,9 +141,9 @@ function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, ref
             </span>
           </div>
 
-          {review.feedback_text ? (
+          {(review.feedback_text || review.public_review_text) ? (
             <div className="bg-gray-50 rounded-xl px-4 py-3">
-              <p className="text-xs text-gray-600 leading-relaxed">{review.feedback_text}</p>
+              <p className="text-xs text-gray-600 leading-relaxed">{review.feedback_text || review.public_review_text}</p>
             </div>
           ) : (
             <p className="text-xs text-gray-400 italic">No feedback text provided.</p>
@@ -694,10 +694,10 @@ function ReviewsPage() {
                     <span className="text-[10px] text-gray-400 ml-auto shrink-0">{fmtDate(r.created_at)}</span>
                   </div>
                   <StarRow rating={r.rating} />
-                  {r.feedback_text && (
+                  {(r.feedback_text || r.public_review_text) && (
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed"
                       style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {r.feedback_text}
+                      {r.feedback_text || r.public_review_text}
                     </p>
                   )}
                 </div>

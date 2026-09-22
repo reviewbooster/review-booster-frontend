@@ -200,6 +200,11 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
   const [customerContext, setCustomerContext] = useState(null);
   const [composingNew, setComposingNew] = useState(false);
   const lastSentAtRef = useRef(item.reply_sent_at);
+  const [nextFollowUp, setNextFollowUp] = useState(null);
+  const [followUpLoaded, setFollowUpLoaded] = useState(false);
+  const [settingReminder, setSettingReminder] = useState(false);
+  const [cancelingReminder, setCancelingReminder] = useState(false);
+  const [reminderDays, setReminderDays] = useState(3);
 
   useEffect(function() {
     api.get('/business/my-settings').then(function(res) {
@@ -236,6 +241,58 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
   var status       = getStatus(item);
   var customer     = (item.customer_id && typeof item.customer_id === 'object') ? item.customer_id : null;
   var customerName = (customer && customer.name) ? customer.name : 'Anonymous';
+  var customerIdForFollowUp = customer && customer._id;
+
+  // Fetch any existing open follow-up for this customer -- so the reminder
+  // toggle below never blindly overwrites something unrelated the owner
+  // already scheduled from the Customer page (only one open follow-up is
+  // allowed per customer at a time; see followup.controller.js).
+  useEffect(function() {
+    if (!customerIdForFollowUp) { setFollowUpLoaded(true); return; }
+    api.get('/customers/' + customerIdForFollowUp + '/follow-up').then(function(res) {
+      setNextFollowUp(res.data && res.data.data ? res.data.data : null);
+    }).catch(function() {}).finally(function() { setFollowUpLoaded(true); });
+  }, [customerIdForFollowUp]);
+
+  // Marked with this prefix so we can tell "a reminder this toggle set" apart
+  // from an unrelated follow-up the owner scheduled some other way -- only
+  // the former is safe for the toggle to reschedule or cancel.
+  var FEEDBACK_REMINDER_MARK = '[Feedback reminder]';
+  var ownsFollowUp = !!(nextFollowUp && nextFollowUp.note && nextFollowUp.note.indexOf(FEEDBACK_REMINDER_MARK) === 0);
+
+  // One recommended next action (PDF Section 3): negative feedback defaults
+  // to Apologize, neutral defaults to Ask for Details -- private feedback is
+  // always 1-3 stars, so there's no positive case to cover here. This only
+  // highlights a suggestion; the owner still picks explicitly.
+  var suggestedTemplate = getSentiment(item.rating) === 'Negative' ? 'apologize' : 'ask_details';
+
+  // Every reply ever sent, oldest first, for the timeline below. Falls back
+  // to the single reply_sent_at/channel/text fields for feedback that was
+  // replied to before the replies array existed.
+  var replyEvents = (item.replies && item.replies.length > 0)
+    ? item.replies
+    : (item.reply_sent_at ? [{ channel: item.reply_channel, text: item.reply_text, sent_at: item.reply_sent_at }] : []);
+
+  var handleSetReminder = function() {
+    if (!customerIdForFollowUp) return;
+    setSettingReminder(true);
+    var due = new Date();
+    due.setDate(due.getDate() + reminderDays);
+    var excerpt = item.feedback_text ? (': "' + item.feedback_text.slice(0, 60) + (item.feedback_text.length > 60 ? '...' : '') + '"') : '';
+    api.put('/customers/' + customerIdForFollowUp + '/follow-up', { due_date: due.toISOString(), note: FEEDBACK_REMINDER_MARK + ' Follow up on feedback' + excerpt })
+      .then(function(res) { setNextFollowUp(res.data && res.data.data ? res.data.data : null); })
+      .catch(function() {})
+      .finally(function() { setSettingReminder(false); });
+  };
+
+  var handleCancelReminder = function() {
+    if (!customerIdForFollowUp) return;
+    setCancelingReminder(true);
+    api.delete('/customers/' + customerIdForFollowUp + '/follow-up')
+      .then(function() { setNextFollowUp(null); })
+      .catch(function() {})
+      .finally(function() { setCancelingReminder(false); });
+  };
 
   // Includes the customer\'s original feedback as context above the
   // owner\'s reply, so the customer isn\'t confused about why/where a
@@ -371,52 +428,115 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
             </div>
           )}
 
-          {/* Their feedback */}
-          <div className="bg-gray-50 rounded-xl p-4 mb-3">
-            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">
-              {'Their Feedback'}
-            </p>
-            {item.feedback_text ? (
-              <p className="text-sm text-gray-700 leading-relaxed">{item.feedback_text}</p>
-            ) : (
-              <p className="text-xs text-gray-400 italic">No written feedback provided.</p>
-            )}
+          {/* Timeline -- feedback, every reply sent, the reminder, and
+              resolution, all in one chronological log (PDF Section 5:
+              "No lost conversations" / keep messages and status changes
+              connected instead of scattered across separate boxes). */}
+          <div className="mb-4">
+            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-2">{'Timeline'}</p>
+            <div className="space-y-3">
+              <div className="flex gap-2.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-gray-400">{fmtDateTime(item.created_at) + ' \u00b7 via ' + sourceLabel(item.source)}</p>
+                  <p className="text-sm text-gray-700 mt-0.5 font-medium">{'Feedback submitted'}</p>
+                  {item.feedback_text ? (
+                    <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2.5 mt-1 whitespace-pre-wrap">{item.feedback_text}</p>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic mt-1">{'No written feedback provided.'}</p>
+                  )}
+                </div>
+              </div>
+
+              {replyEvents.map(function(r, i) {
+                return (
+                  <div className="flex gap-2.5" key={'reply-' + i}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-gray-400">{fmtDateTime(r.sent_at)}</p>
+                      <p className="text-sm text-gray-700 mt-0.5 font-medium">{'Reply sent via ' + sourceLabel(r.channel)}</p>
+                      <p className="text-sm text-gray-600 bg-green-50 rounded-lg p-2.5 mt-1 whitespace-pre-wrap">
+                        {r.text || '(Message text wasn\u2019t recorded for this one.)'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {nextFollowUp && ownsFollowUp && (
+                <div className="flex gap-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-gray-400">{nextFollowUp.created_at ? fmtDateTime(nextFollowUp.created_at) : ''}</p>
+                    <p className="text-sm text-gray-700 mt-0.5 font-medium">{'Reminder scheduled for ' + fmtDate(nextFollowUp.due_date)}</p>
+                  </div>
+                </div>
+              )}
+
+              {status === 'Resolved' && (
+                <div className="flex gap-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-gray-400">{item.resolved_at ? fmtDateTime(item.resolved_at) : ''}</p>
+                    <p className="text-sm text-gray-700 mt-0.5 font-medium">
+                      {item.resolved_by ? 'Resolved by ' + item.resolved_by : 'Marked as resolved'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-
-          <p className="text-xs text-gray-400 mb-2">
-            {fmtDate(item.created_at) + ' \u00b7 via ' + sourceLabel(item.source)}
-          </p>
-
-          {/* Resolution trail */}
-          {status === 'Resolved' && (
-            <p className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2 mb-3 flex items-center gap-1.5">
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              {item.resolved_by
-                ? 'Resolved by ' + item.resolved_by + (item.resolved_at ? ' on ' + fmtDate(item.resolved_at) : '')
-                : 'Marked as resolved' + (item.resolved_at ? ' on ' + fmtDate(item.resolved_at) : '')}
-            </p>
-          )}
 
           {customer && (customer.phone || customer.email) ? (
             <div className="mb-5">
               {item.reply_sent_at && !composingNew ? (
                 <div className="bg-green-50 rounded-xl p-3.5">
-                  <p className="text-[10px] text-green-700 font-semibold flex items-center gap-1 mb-1.5">
+                  <p className="text-[10px] text-green-700 font-semibold flex items-center gap-1">
                     <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
-                    {'Sent via ' + sourceLabel(item.reply_channel) + ' \u00b7 ' + fmtDateTime(item.reply_sent_at)}
-                  </p>
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {item.reply_text || '(Message text wasn\u2019t recorded for this one -- only replies sent after this update are saved.)'}
+                    {'Reply sent \u2014 see Timeline above'}
                   </p>
                   {!isStaff && status !== 'Resolved' && (
                     <button type="button" onClick={function() { setComposingNew(true); }}
                       className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 mt-2">
                       {'Send another reply'}
                     </button>
+                  )}
+
+                  {followUpLoaded && (
+                    nextFollowUp ? (
+                      ownsFollowUp ? (
+                        <div className="mt-3 pt-3 border-t border-green-100 flex items-center justify-between gap-2 flex-wrap">
+                          <p className="text-[11px] text-gray-600">{'\uD83D\uDD14 Reminder set for ' + fmtDate(nextFollowUp.due_date)}</p>
+                          <button type="button" onClick={handleCancelReminder} disabled={cancelingReminder}
+                            className="text-[10px] font-semibold text-gray-400 hover:text-red-500 disabled:opacity-50">
+                            {cancelingReminder ? '\u2026' : 'Cancel'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 pt-3 border-t border-green-100">
+                          <p className="text-[11px] text-gray-500">
+                            {'This customer already has a follow-up scheduled for ' + fmtDate(nextFollowUp.due_date) + '. '}
+                            <a href={'/dashboard/customers/' + customerIdForFollowUp} target="_blank" rel="noopener noreferrer" className="text-purple-600 font-semibold hover:underline">{'Manage it \u2192'}</a>
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="mt-3 pt-3 border-t border-green-100 flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] text-gray-600">{'Remind me in'}</span>
+                        <select value={reminderDays} onChange={function(e) { setReminderDays(parseInt(e.target.value, 10)); }}
+                          className="text-[11px] border border-gray-200 rounded-lg px-1.5 py-1 outline-none focus:ring-2 focus:ring-purple-200 bg-white">
+                          <option value={3}>3 days</option>
+                          <option value={7}>7 days</option>
+                          <option value={14}>14 days</option>
+                        </select>
+                        <button type="button" onClick={handleSetReminder} disabled={settingReminder}
+                          className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 disabled:opacity-50">
+                          {settingReminder ? '\u2026 Setting' : 'Set reminder'}
+                        </button>
+                      </div>
+                    )
                   )}
                 </div>
               ) : (
@@ -425,14 +545,16 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                   {!isStaff && (
                     <div className="flex gap-1.5 mb-2 flex-wrap">
                       {TEMPLATE_OPTIONS.map(function(t) {
+                        var isSuggested = t.key === suggestedTemplate;
                         return (
                           <button
                             key={t.key}
                             type="button"
                             onClick={function() { handleSuggestReply(t.key); }}
                             disabled={!!suggesting}
-                            className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600 disabled:opacity-50 flex items-center gap-1 transition-colors">
+                            className={'text-[10px] font-semibold px-2.5 py-1.5 rounded-lg border disabled:opacity-50 flex items-center gap-1 transition-colors ' + (isSuggested ? 'border-purple-400 ring-1 ring-purple-300 text-purple-700 bg-purple-50' : 'border-gray-200 text-gray-600 hover:border-purple-300 hover:text-purple-600')}>
                             {suggesting === t.key ? <><span className='spinner' /> {'\u2026'}</> : t.label}
+                            {isSuggested && <span className="text-[8px] font-bold uppercase text-purple-500">{'\u2022 Suggested'}</span>}
                           </button>
                         );
                       })}
@@ -579,12 +701,20 @@ function FeedbackPage() {
   const [tagOptions,  setTagOptions]  = useState([]);
   const [resolving,   setResolving]   = useState(null);
   const [viewItem,    setViewItem]    = useState(null);
+  const [themeSummary,      setThemeSummary]      = useState(null);
+  const [themeSummaryOpen,  setThemeSummaryOpen]  = useState(false);
 
   const dateDropdownRef = useRef(null);
   const sortMenuRef     = useRef(null);
   const firstLoadRef    = useRef(true);
   const LIMIT = 10;
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(function() {
+    api.get('/reviews/theme-summary?days=30').then(function(res) {
+      setThemeSummary(res.data && res.data.data ? res.data.data : null);
+    }).catch(function() {});
+  }, []);
 
   useEffect(function() {
     Promise.all([
@@ -746,16 +876,17 @@ function FeedbackPage() {
       var newStage = updated.stage || 'awaiting_confirmation';
       var replySentAt = updated.reply_sent_at || new Date().toISOString();
       var storedReplyText = updated.reply_text != null ? updated.reply_text : (replyText || null);
+      var storedReplies = updated.replies || null;
 
       var prevItem = items.find(function(r) { return r._id === id; }) || viewItem;
       var oldBucket = bucketOfStage(prevItem ? (prevItem.stage || 'new') : 'new');
       var newBucket = bucketOfStage(newStage);
 
       setItems(function(prev) {
-        return prev.map(function(r) { return r._id === id ? Object.assign({}, r, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }) : r; });
+        return prev.map(function(r) { return r._id === id ? Object.assign({}, r, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }, storedReplies ? { replies: storedReplies } : {}) : r; });
       });
       setViewItem(function(prev) {
-        return prev && prev._id === id ? Object.assign({}, prev, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }) : prev;
+        return prev && prev._id === id ? Object.assign({}, prev, { stage: newStage, reply_sent_at: replySentAt, reply_channel: channel, reply_text: storedReplyText }, storedReplies ? { replies: storedReplies } : {}) : prev;
       });
 
       if (oldBucket !== newBucket) {
@@ -822,6 +953,62 @@ function FeedbackPage() {
           isStaff={isStaff}
           onStageChange={handleStageChange}
           onMarkSent={handleMarkSent} />
+      )}
+
+      {/* Common Themes -- real category counts across the last 30 days, not
+          a generated summary. Collapsed by default so it doesn't compete
+          with the actual feedback list. */}
+      {themeSummary && (themeSummary.positive.length > 0 || themeSummary.negative.length > 0) && (
+        <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-hidden">
+          <button
+            type="button"
+            onClick={function() { setThemeSummaryOpen(!themeSummaryOpen); }}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors">
+            <span className="text-sm font-semibold text-gray-700">
+              {'Common Themes \u2014 last ' + themeSummary.days + ' days'}
+            </span>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+              className={'text-gray-400 transition-transform ' + (themeSummaryOpen ? 'rotate-180' : '')}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {themeSummaryOpen && (
+            <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {themeSummary.negative.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    {'Most common issues'}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {themeSummary.negative.map(function(t) {
+                      return (
+                        <span key={t.label} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+                          {t.label + ' \u00b7 ' + t.count}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {themeSummary.positive.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    {'What customers liked most'}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {themeSummary.positive.map(function(t) {
+                      return (
+                        <span key={t.label} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-600">
+                          {t.label + ' \u00b7 ' + t.count}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Tab bar */}
