@@ -429,8 +429,6 @@ function buildPrefilledLink(channel, customer, reviewUrl, template) {
 function SendRequestModal({ customer, onClose, onSent }) {
   const [loadingCh, setLoadingCh] = useState(null);
   const [error,     setError]     = useState('');
-  const [result,    setResult]    = useState(null);
-  const [copied,    setCopied]    = useState(false);
   const [servedBy,  setServedBy]  = useState(null);
   const [template,  setTemplate]  = useState(DEFAULT_REVIEW_TEMPLATE);
 
@@ -457,25 +455,19 @@ function SendRequestModal({ customer, onClose, onSent }) {
     setLoadingCh(channel);
     try {
       const { data } = await api.post('/requests', { customer_id: customer._id, channel, served_by: servedBy });
-      setResult({ channel, reviewUrl: data.review_url });
+      const link = buildPrefilledLink(channel, customer, data.review_url, template);
       onSent();
+      // Navigating the current tab (not opening a new window) is what
+      // reliably hands off to WhatsApp/Messages/Mail on mobile -- a
+      // wa.me/sms/mailto URL doesn't actually leave the page, the OS just
+      // intercepts it, so this works the same as a real click would.
+      window.location.href = link;
+      onClose();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate link.');
-    } finally {
       setLoadingCh(null);
     }
   };
-
-  const copyLink = async () => {
-    if (!result) return;
-    try {
-      await navigator.clipboard.writeText(result.reviewUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (_) {}
-  };
-
-  const remaining = ['whatsapp', 'sms', 'email'].filter(ch => ch !== result?.channel);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -483,7 +475,7 @@ function SendRequestModal({ customer, onClose, onSent }) {
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
             <h2 className="font-bold text-gray-900">
-              {result ? (CHANNEL_META[result.channel].label + ' Ready!') : 'Send Review Request'}
+              {'Send Review Request'}
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">{customer.name}</p>
           </div>
@@ -491,78 +483,26 @@ function SendRequestModal({ customer, onClose, onSent }) {
         </div>
         <div className="p-6 space-y-4">
           {error && <div className="alert-error"><span>{'!'}</span><span>{error}</span></div>}
-          {!result ? (
-            <>
-              <p className="text-sm text-gray-500">Tap a channel to generate the review link for this customer.</p>
-              <StaffPicker value={servedBy} onChange={setServedBy} label="Who served this customer? (optional)" />
-              <div className="space-y-3">
-                {['whatsapp', 'sms', 'email'].map(ch => {
-                  const meta   = CHANNEL_META[ch];
-                  const noData = meta.needs === 'phone' ? !customer.phone : !customer.email;
-                  return (
-                    <button key={ch} onClick={() => handleSend(ch)} disabled={!!loadingCh || noData}
-                      className={'w-full flex items-center justify-between px-4 py-3 rounded-xl text-white text-sm font-semibold transition-colors duration-150 ' + meta.color + ' disabled:opacity-40 disabled:cursor-not-allowed'}>
-                      <span>{meta.label}</span>
-                      {loadingCh === ch
-                        ? <span className="spinner border-white/30 border-t-white" />
-                        : noData
-                          ? <span className="text-xs font-normal opacity-70">{'No ' + meta.needs}</span>
-                          : <span className="opacity-60">{'\u2192'}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <button onClick={onClose} className="btn-secondary w-full justify-center">Cancel</button>
-            </>
-          ) : (
-            <>
-              <div className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl p-4">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0 font-bold text-sm">{'\u2713'}</div>
-                <div>
-                  <p className="text-sm font-semibold text-green-800">Link ready!</p>
-                  <p className="text-xs text-green-600 mt-0.5">Tap the button below to send the pre-filled message.</p>
-                </div>
-              </div>
-              <a href={buildPrefilledLink(result.channel, customer, result.reviewUrl, template)}
-                {...waLinkProps()}
-                className="btn-primary w-full flex items-center justify-center">
-                {'Open ' + CHANNEL_META[result.channel].label}
-              </a>
-              <div>
-                <p className="label mb-1">Or copy the link</p>
-                <div className="flex gap-2">
-                  <input readOnly value={result.reviewUrl} className="input text-base sm:text-xs flex-1 font-mono"
-                    onFocus={e => e.target.select()} />
-                  <button onClick={copyLink}
-                    className={'py-2 px-3 rounded-xl text-sm font-semibold border transition-colors duration-150 ' +
-                      (copied ? 'border-green-300 text-green-600 bg-green-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50')}>
-                    {copied ? '\u2713' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-              {remaining.length > 0 && (
-                <div>
-                  <p className="label mb-1">Also send via</p>
-                  <div className="flex gap-2">
-                    {remaining.map(ch => {
-                      const meta   = CHANNEL_META[ch];
-                      const noData = meta.needs === 'phone' ? !customer.phone : !customer.email;
-                      return noData ? (
-                        <span key={ch} className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-100 text-gray-300 text-center">{meta.label}</span>
-                      ) : (
-                        <a key={ch} href={buildPrefilledLink(ch, customer, result.reviewUrl, template)}
-                          {...waLinkProps()}
-                          className="flex-1 py-2 px-3 rounded-xl text-sm font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors duration-150 text-center">
-                          {meta.label}
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              <button onClick={onClose} className="btn-secondary w-full justify-center">Done</button>
-            </>
-          )}
+          <p className="text-sm text-gray-500">Tap a channel to send the review request.</p>
+          <StaffPicker value={servedBy} onChange={setServedBy} label="Who served this customer? (optional)" />
+          <div className="space-y-3">
+            {['whatsapp', 'sms', 'email'].map(ch => {
+              const meta   = CHANNEL_META[ch];
+              const noData = meta.needs === 'phone' ? !customer.phone : !customer.email;
+              return (
+                <button key={ch} onClick={() => handleSend(ch)} disabled={!!loadingCh || noData}
+                  className={'w-full flex items-center justify-between px-4 py-3 rounded-xl text-white text-sm font-semibold transition-colors duration-150 ' + meta.color + ' disabled:opacity-40 disabled:cursor-not-allowed'}>
+                  <span>{meta.label}</span>
+                  {loadingCh === ch
+                    ? <span className="spinner border-white/30 border-t-white" />
+                    : noData
+                      ? <span className="text-xs font-normal opacity-70">{'No ' + meta.needs}</span>
+                      : <span className="opacity-60">{'\u2192'}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={onClose} className="btn-secondary w-full justify-center">Cancel</button>
         </div>
       </div>
     </div>
@@ -1290,7 +1230,7 @@ function CustomersPage() {
 
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
-      <div id="tour-customers-list" className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 last:border-0">
@@ -1318,6 +1258,7 @@ function CustomersPage() {
           customers.map((c, i) => (
             <div
               key={c._id}
+              id={i === 0 ? 'tour-customers-list' : undefined}
               onClick={() => router.push('/dashboard/customers/' + c._id)}
               className="flex flex-col gap-1.5 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100 cursor-pointer"
             >

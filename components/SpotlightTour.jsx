@@ -11,126 +11,133 @@ var HUB_STEPS = [
     id: 'hub-dashboard',
     selector: '[data-tour-nav="/dashboard"]',
     title: 'Dashboard',
-    description: 'This is your business command center. See how you\u2019re performing and reach the most important actions from here.',
+    line: 'Your business command center.',
+    points: ['See performance', 'Reach key actions fast'],
   },
   {
     id: 'home-1',
     selector: '[data-tour="dashboard-stats"]',
-    title: 'Your numbers at a glance',
-    description: 'Average rating, total reviews, Google reviews, and private feedback \u2014 updated live, right when you open the app.',
+    title: 'Your Numbers',
+    line: 'Live stats, right when you open the app.',
+    points: ['Rating, reviews, feedback'],
   },
   {
     id: 'home-2',
     selector: '#tour-send-request-btn, [aria-label="Send Review Request"]',
     title: 'Send Review Request',
-    description: 'The one thing you\u2019ll do most, always one tap away \u2014 here on desktop, or the + button at the bottom of your screen on mobile.',
+    line: 'Get a request out in one tap.',
+    points: [],
   },
   {
     id: 'home-3',
     selector: '#tour-quick-actions',
     title: 'Quick Actions',
-    description: 'Needs Followup, Check Private Feedback, View Analytics, View Reviews \u2014 your most common next steps, all in one place.',
+    line: 'Jump straight to what\u2019s next.',
+    points: ['Follow-ups', 'Feedback', 'Analytics', 'Reviews'],
   },
   {
     id: 'hub-reviews',
     selector: '[data-tour-nav="/dashboard/reviews-hub"]',
     title: 'Reviews',
-    description: 'Where you collect, manage and understand customer feedback \u2014 your QR code, public Google reviews, and private feedback all live here.',
+    line: 'Collect and manage all your reviews.',
+    points: ['QR code', 'Google reviews', 'Private feedback'],
   },
   {
     id: 'hub-customers',
     selector: '[data-tour-nav="/dashboard/customers"]',
     title: 'Customers',
-    description: 'Every customer record, review request, and follow-up you manage \u2014 all in one place.',
+    line: 'Every customer, in one place.',
+    points: ['Records', 'Requests', 'Follow-ups'],
   },
   {
     id: 'hub-growth',
     selector: '[data-tour-nav="/dashboard/growth-hub"]',
     title: 'Growth',
-    description: 'Turn happy customers into referrals, win back the ones who haven\u2019t been in for a while, and see what\u2019s actually working.',
+    line: 'Turn customers into growth.',
+    points: ['Referrals', 'Win-back', 'Analytics'],
   },
   {
     id: 'hub-settings',
     selector: '[data-tour-nav="/dashboard/settings-hub"]',
     title: 'Settings',
-    description: 'Your business profile, message templates, and everything that configures how ReviewBooster behaves.',
+    line: 'Configure your business.',
+    points: ['Profile', 'Message templates'],
   },
 ];
 
 // -- Level 2: Deep dives ----------------------------------------------------
 // Each deep dive only starts once the owner is actually on that page --
-// triggered from DeepDiveTrigger, not from the hub tour directly.
+// triggered from each page's own first-visit effect, not from the hub tour.
 var DEEP_DIVES = {
   qr: {
     route: '/dashboard/qr',
     steps: [
-      { id: 'qr-1', selector: '#tour-qr-card', title: 'Your QR code', description: 'This is what customers scan to start leaving you feedback. Always active, unique to your business.' },
-      { id: 'qr-2', selector: '#tour-qr-actions', title: 'Download, Share, Print', description: 'Download it as an image, share it straight to WhatsApp, or jump to printable materials \u2014 table tents, posters, stickers, counter cards.' },
-      { id: 'qr-3', selector: '#tour-qr-placement', title: 'Where will you use it?', description: 'Tell us Counter, Table, or Staff and we\u2019ll recommend the print material that fits \u2014 or tap Staff to set up individual QR codes for your team.' },
-      { id: 'qr-4', selector: '#tour-qr-performance', title: 'Review Performance', description: 'Scans, feedback, reviews, and conversion \u2014 pick a window and see how your QR is actually doing.' },
+      { id: 'qr-1', selector: '#tour-qr-card', title: 'Your QR Code', line: 'Customers scan this to leave feedback.', points: [] },
+      { id: 'qr-2', selector: '#tour-qr-actions', title: 'Download, Share, Print', line: 'Get it in front of customers.', points: [] },
+      { id: 'qr-3', selector: '#tour-qr-placement', title: 'Where Will You Use It?', line: 'Tell us, and we\u2019ll recommend a design.', points: [] },
+      { id: 'qr-4', selector: '#tour-qr-performance', title: 'Performance', line: 'Track scans, reviews, and conversion.', points: [] },
     ],
   },
   reviews: {
     route: '/dashboard/reviews',
     steps: [
-      { id: 'rev-1', selector: '#tour-review-list', title: 'Your reviews', description: 'Every public review you\u2019ve collected, newest first.' },
-      { id: 'rev-2', selector: '#tour-review-first-card', title: 'Review details', description: 'Tap any review to see the full text and the customer\u2019s contact info.' },
+      { id: 'rev-2', selector: '#tour-review-first-card', title: 'Your Reviews', line: 'Tap any review for full details.', points: [] },
     ],
   },
   feedback: {
     route: '/dashboard/feedback',
     steps: [
-      { id: 'fb-1', selector: '#tour-feedback-tabs', title: 'Unresolved, In Progress, Resolved', description: 'Private feedback moves through these three stages as you work through it.' },
-      { id: 'fb-2', selector: '#tour-feedback-first-card', title: 'A piece of feedback', description: 'Tap one to see the full complaint, reply templates, and everything else you can do with it.' },
+      { id: 'fb-1', selector: '#tour-feedback-tabs', title: 'Feedback Stages', line: 'Moves through 3 stages as you work it.', points: ['Unresolved \u2192 In Progress \u2192 Resolved'] },
+      { id: 'fb-2', selector: '#tour-feedback-first-card', title: 'A Feedback Item', line: 'Tap one to respond.', points: [] },
     ],
   },
   customers: {
     route: '/dashboard/customers',
     steps: [
-      { id: 'cust-1', selector: '#tour-add-customer', title: 'Add Customer', description: 'Create a customer record by hand, whenever you have someone\u2019s details but no QR scan to go with them.' },
-      { id: 'cust-2', selector: '#tour-customers-list', title: 'Your customers', description: 'Everyone who\u2019s scanned your QR, been added manually, or left feedback \u2014 all in one list, searchable.' },
+      { id: 'cust-1', selector: '#tour-add-customer', title: 'Add Customer', line: 'Add someone by hand, anytime.', points: [] },
+      { id: 'cust-2', selector: '#tour-customers-list', title: 'Your Customers', line: 'Everyone, searchable.', points: [] },
     ],
   },
   'customer-detail': {
     route: null, // dynamic route -- matched by prefix at trigger time
     steps: [
-      { id: 'cd-1', selector: '#tour-customer-actions', title: 'Message, Call, Follow-up', description: 'The three things you\u2019ll do most with a customer record, always right at the top.' },
-      { id: 'cd-2', selector: '#tour-customer-followup', title: 'Next follow-up', description: 'See what\u2019s already scheduled, or set one up \u2014 so nobody falls through the cracks.' },
+      { id: 'cd-1', selector: '#tour-customer-actions', title: 'Message, Call, Follow-up', line: 'Your most-used actions, up top.', points: [] },
+      { id: 'cd-2', selector: '#tour-customer-followup', title: 'Next Follow-up', line: 'See what\u2019s scheduled, or set one.', points: [] },
     ],
   },
   settings: {
     route: '/dashboard/settings-hub',
     steps: [
-      { id: 'set-1', selector: '#tour-settings-profile', title: 'Business Profile', description: 'Your name, photo, business type, and Google review link all live here \u2014 the basics that affect everything else.' },
-      { id: 'set-2', selector: '#tour-settings-templates', title: 'Message Templates', description: 'Every automated message ReviewBooster sends on your behalf \u2014 review requests, thank-yous, follow-ups \u2014 gets edited here.' },
+      { id: 'set-1', selector: '#tour-settings-profile', title: 'Business Profile', line: 'Your name, photo, type, Google link.', points: [] },
+      { id: 'set-2', selector: '#tour-settings-templates', title: 'Message Templates', line: 'Every automated message, edited here.', points: [] },
     ],
   },
   templates: {
     route: '/dashboard/settings/message-templates',
     steps: [
-      { id: 'tpl-1', selector: '#tour-template-review-request', title: 'Editing a template', description: 'You only write the middle part \u2014 the greeting and the review link (shown as locked pills above and below) are added automatically, every time.' },
-      { id: 'tpl-2', selector: '#tour-template-save', title: 'Save Templates', description: 'One button saves all three templates at once. Changes apply to every message sent from that point on.' },
+      { id: 'tpl-1', selector: '#tour-template-review-request', title: 'Editing a Template', line: 'Write the middle \u2014 the rest is automatic.', points: ['Name & link added for you'] },
+      { id: 'tpl-2', selector: '#tour-template-save', title: 'Save Templates', line: 'One tap saves all three.', points: [] },
     ],
   },
   referrals: {
     route: '/dashboard/referrals',
     steps: [
-      { id: 'ref-1', selector: '#tour-referral-redeem', title: 'Redeem a Referral', description: 'When a walk-in customer shows you their referral code, enter it here \u2014 this is the only place a referral actually gets credited.' },
-      { id: 'ref-2', selector: '#tour-referral-top', title: 'Top Referrers', description: 'See who\u2019s referred the most customers and who\u2019s earned a reward, ranked by points.' },
+      { id: 'ref-1', selector: '#tour-referral-redeem', title: 'Redeem a Referral', line: 'Enter a customer\u2019s code here.', points: [] },
+      { id: 'ref-2', selector: '#tour-referral-top', title: 'Top Referrers', line: 'See who\u2019s earned the most.', points: [] },
     ],
   },
   'win-back': {
     route: '/dashboard/win-back',
     steps: [
-      { id: 'wb-1', selector: '#tour-winback-settings', title: 'Win-back reminders', description: 'Set how many inactive days count as \u201cdue,\u201d write your message once, and turn it on \u2014 customers who cross that line show up below automatically.' },
-      { id: 'wb-2', selector: '#tour-winback-due', title: 'Customers Due', description: 'Everyone past your threshold, with a pre-filled WhatsApp message one tap away.' },
+      { id: 'wb-1', selector: '#tour-winback-settings', title: 'Win-Back Reminders', line: 'Turn on automatic reminders.', points: ['Set your inactive-days threshold'] },
+      { id: 'wb-2', selector: '#tour-winback-due', title: 'Customers Due', line: 'Everyone due, message ready.', points: [] },
     ],
   },
   analytics: {
     route: '/dashboard/analytics',
     steps: [
-      { id: 'an-1', selector: '#tour-analytics-summary', title: 'Your numbers', description: 'Requests sent, reviews collected, and your average rating, all in one strip.' },
-      { id: 'an-2', selector: '#tour-analytics-funnel', title: 'Review Funnel', description: 'See exactly where your reviews are coming from \u2014 and if any went to private feedback instead of Google, that\u2019s shown here too.' },
+      { id: 'an-1', selector: '#tour-analytics-summary', title: 'Your Numbers', line: 'Requests, reviews, and rating.', points: [] },
+      { id: 'an-2', selector: '#tour-analytics-funnel', title: 'Review Funnel', line: 'See where your reviews come from.', points: [] },
     ],
   },
 };
@@ -333,7 +340,7 @@ export default function SpotlightTour() {
   var tooltipStyle = {};
   var vw = window.innerWidth, vh = window.innerHeight;
   var TW = Math.min(320, vw - 24);
-  var TH_ESTIMATE = 170;
+  var TH_ESTIMATE = 130;
   // A fixed estimate rather than trying to read env(safe-area-inset-bottom)
   // via JS (which has no reliable cross-browser read path without injecting
   // a probe element) -- generous enough to clear the home indicator on
@@ -393,7 +400,8 @@ export default function SpotlightTour() {
             step={stepIdx}
             total={stepList.length}
             title={currentStep.title}
-            description={currentStep.description}
+            line={currentStep.line}
+            points={currentStep.points}
             isLast={isLast}
             onNext={goNext}
             onSkip={skipTour}
@@ -409,7 +417,8 @@ export default function SpotlightTour() {
               step={stepIdx}
               total={stepList.length}
               title={currentStep.title}
-              description={currentStep.description}
+              line={currentStep.line}
+              points={currentStep.points}
               isLast={isLast}
               onNext={goNext}
               onSkip={skipTour}
@@ -421,7 +430,7 @@ export default function SpotlightTour() {
   );
 }
 
-function TourCardContent({ step, total, title, description, isLast, onNext, onSkip }) {
+function TourCardContent({ step, total, title, line, points, isLast, onNext, onSkip }) {
   return (
     <div>
       <div className="flex items-center gap-1 mb-2.5">
@@ -438,8 +447,20 @@ function TourCardContent({ step, total, title, description, isLast, onNext, onSk
       <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wide mb-1">
         {(step + 1) + ' of ' + total}
       </p>
-      <p className="text-sm font-bold text-gray-900 mb-1.5">{title}</p>
-      <p className="text-xs text-gray-500 leading-relaxed mb-4">{description}</p>
+      <p className="text-sm font-bold text-gray-900 mb-1">{title}</p>
+      <p className="text-xs text-gray-500 leading-snug mb-2">{line}</p>
+      {points && points.length > 0 && (
+        <ul className="mb-3 space-y-1">
+          {points.map(function(pt, i) {
+            return (
+              <li key={i} className="text-[11px] text-gray-500 flex items-start gap-1.5">
+                <span className="text-purple-400 leading-none mt-0.5">{'\u2022'}</span>
+                <span>{pt}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <div className="flex items-center justify-between">
         <button
           type="button"

@@ -11,7 +11,6 @@ import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import GettingStartedChecklist from '../../components/GettingStartedChecklist';
 import NextActionBanner from '../../components/NextActionBanner';
 
 const PERIOD_OPTIONS = [
@@ -50,29 +49,30 @@ function calcTrend(current, previous) {
 }
 
 /* --- Mini stat card -------------------------------------------------------- */
-function MiniCard({ icon, iconBg, label, value, trend, trendSuffix, isTrialCard }) {
+
+function StatsGroupCard({ items }) {
   return (
-    <div className={'bg-white rounded-2xl border shadow-sm p-2 flex flex-col justify-between flex-1 min-h-0 overflow-hidden ' +
-      (isTrialCard ? 'border-purple-200' : 'border-gray-100')}>
-      <div className="flex items-start justify-between gap-1">
-        <p className="text-[10px] font-semibold text-gray-400 leading-tight truncate">{label}</p>
-        <div className={'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-xs ' + iconBg}>
-          {icon}
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 divide-y divide-gray-50 h-full">
+      {items.map((c) => (
+        <div key={c.label} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs ' + c.iconBg}>
+              {c.icon}
+            </div>
+            <p className="text-xs font-semibold text-gray-500 truncate">{c.label}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-base font-bold text-gray-900 leading-none tabular-nums">{c.value}</p>
+            {c.trend != null ? (
+              <p className={'text-[10px] font-semibold mt-0.5 ' + (c.trend.up ? 'text-emerald-500' : 'text-red-400')}>
+                {(c.trend.up ? '\u2191 +' : '\u2193 -') + c.trend.pct + '%'}
+              </p>
+            ) : (
+              <p className="text-[10px] text-gray-300 mt-0.5">New</p>
+            )}
+          </div>
         </div>
-      </div>
-      <p className="text-[22px] font-bold text-gray-900 leading-none tabular-nums text-center">{value}</p>
-      {isTrialCard ? (
-        <Link href="/dashboard/settings/billing" className="text-[10px] font-semibold leading-none text-center text-purple-600 hover:text-purple-700">
-          {'Upgrade plan \u2192'}
-        </Link>
-      ) : trend != null ? (
-        <p className={'text-[10px] font-semibold leading-none text-center ' + (trend.up ? 'text-emerald-500' : 'text-red-400')}>
-          {(trend.up ? '\u2191 +' : '\u2193 -') + trend.pct + '%'}
-          <span className="hidden md:inline">{'\u00a0' + trendSuffix}</span>
-        </p>
-      ) : (
-        <p className="text-[10px] text-gray-300 leading-none text-center">Just getting started</p>
-      )}
+      ))}
     </div>
   );
 }
@@ -545,24 +545,13 @@ function DashboardPage() {
         )}
       </div>
 
-        <GettingStartedChecklist hasGoogleLink={!needsGoogleUrl} hasSentRequest={(summary?.total_requests_sent || 0) > 0} />
       {/* Data sections -- fade during period re-fetch */}
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
-        {/* Mobile: full-width avg card, 3 mini cards in a row below */}
-        <div data-tour="dashboard-stats" className="md:hidden mb-5">
-          <div className="mb-2.5">
-            <AvgCard summary={summary} mtd={mtd} mobile />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
-          </div>
-        </div>
-
-        {/* Desktop: flat 4-col row */}
-        <div data-tour="dashboard-stats" className="hidden md:grid md:grid-cols-4 gap-4 mb-5">
+        {/* Hero rating card + grouped stats card, side by side once there's room */}
+        <div data-tour="dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-5">
           <AvgCard summary={summary} mtd={mtd} />
-          {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
+          <StatsGroupCard items={miniCards} />
         </div>
 
         {/* Primary action -- the one thing an owner needs to do fast, in

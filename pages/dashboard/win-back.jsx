@@ -154,8 +154,8 @@ function WinBackPage() {
         </div>
       )}
 
-      <div id="tour-winback-settings" className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        <div id="tour-winback-settings" className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-semibold text-gray-900">Enable win-back reminders</p>
             <p className="text-xs text-gray-400 mt-0.5">When on, customers show up below once they cross your threshold.</p>

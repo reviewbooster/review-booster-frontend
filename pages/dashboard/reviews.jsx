@@ -78,7 +78,7 @@ function channelLabel(ch) {
   return ch;
 }
 
-function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, referringId, thankReferLink }) {
+function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, referringId }) {
   if (!review) return null;
   var cust = review.customer_id || {};
   var name = cust.name || 'Anonymous';
@@ -160,12 +160,6 @@ function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, ref
                 {referringId === review._id ? '\u2026' : <>{'\uD83D\uDC65'} Thank + Refer on WhatsApp</>}
               </button>
             )}
-            {thankReferLink && thankReferLink.id === review._id && (
-              <a href={thankReferLink.url} {...waLinkProps()}
-                className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors">
-                Tap to open WhatsApp
-              </a>
-            )}
           </div>
         )}
       </div>
@@ -232,7 +226,6 @@ function ReviewsPage() {
   const [exportLoading,  setExportLoading]  = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [referringId,    setReferringId]    = useState(null);
-  const [thankReferLink, setThankReferLink] = useState(null);
 
   const dateDropdownRef = useRef(null);
   const sortMenuRef     = useRef(null);
@@ -366,11 +359,6 @@ function ReviewsPage() {
   var handleThankAndRefer = async function(r) {
     if (!r.customer_id || !r.customer_id.phone || referringId) return;
     setReferringId(r._id);
-    setThankReferLink(null);
-    // Opened synchronously, before any await, so this still counts as a
-    // direct response to the tap rather than a blocked popup -- we fill in
-    // its destination once the WhatsApp URL is actually ready.
-    var tab = window.open('', '_blank', 'noopener,noreferrer');
     try {
       var res = await api.get('/referrals/customer/' + r.customer_id._id);
       var link = window.location.origin + '/ref/' + res.data.data.code + '?owner=1';
@@ -385,15 +373,13 @@ function ReviewsPage() {
         referral_offer:     (refSettings && refSettings.offer_text)  || 'a special offer',
       });
       var waUrl = 'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg);
-      if (tab) {
-        tab.location.href = waUrl;
-      } else {
-        // Popup was blocked despite our best effort -- fall back to a
-        // tappable link instead of silently failing.
-        setThankReferLink({ id: r._id, url: waUrl });
-      }
+      // Navigating the current tab (not opening a new window) is what
+      // reliably hands off to WhatsApp on mobile -- a wa.me URL doesn't
+      // actually leave the page, the OS just intercepts it. This also
+      // sidesteps popup blocking entirely, which a new-window approach
+      // does not reliably do on mobile browsers.
+      window.location.href = waUrl;
     } catch (_) {
-      if (tab) tab.close();
     }
     setReferringId(null);
   };
@@ -421,8 +407,7 @@ function ReviewsPage() {
         onClose={function() { setSelectedReview(null); }}
         isStaff={isStaff}
         onThankAndRefer={handleThankAndRefer}
-        referringId={referringId}
-        thankReferLink={thankReferLink} />
+        referringId={referringId} />
 
 
       <div className="mb-4">
@@ -667,7 +652,7 @@ function ReviewsPage() {
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
       {/* Reviews list */}
-      <div id="tour-review-list" className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
+      <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
         (fetching ? 'opacity-50 pointer-events-none' : '')}>
         {loading ? (
           Array.from({ length: 5 }).map(function(_, i) {
