@@ -12,6 +12,7 @@ import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import GettingStartedChecklist from '../../components/GettingStartedChecklist';
+import NextActionBanner from '../../components/NextActionBanner';
 
 const PERIOD_OPTIONS = [
   { days: 1,  label: 'Today' },
@@ -96,7 +97,7 @@ function AvgCard({ summary, mtd, mobile }) {
         : 'linear-gradient(145deg,#DC2626 0%,#B91C1C 100%)';
 
   const cardStyle = { background: gradient };
-  if (mobile) cardStyle.height = '250px';
+  if (mobile) cardStyle.height = '160px';
 
   return (
     <div className="rounded-2xl p-4 text-white flex flex-col justify-between" style={cardStyle}>
@@ -139,21 +140,22 @@ function AvgCard({ summary, mtd, mobile }) {
 /* --- Loading skeleton ------------------------------------------------------ */
 function DashboardSkeleton() {
   return (
-    <DashboardLayout>
+    <DashboardLayout showBack={false}>
       <div className="mb-5">
         <div className="h-7 w-48 bg-gray-200 rounded-xl animate-pulse mb-1.5" />
         <div className="h-4 w-60 bg-gray-100 rounded-lg animate-pulse mb-3" />
         <div className="h-7 w-36 bg-gray-100 rounded-xl animate-pulse" />
       </div>
-      <div className="md:hidden grid grid-cols-2 gap-2.5 mb-5">
-        <div className="bg-gray-200 rounded-2xl animate-pulse" style={{ height: '215px' }} />
-        <div className="flex flex-col gap-2 h-[250px]">
-          <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
-          <div className="bg-gray-100 rounded-2xl animate-pulse flex-1" />
+      <div className="md:hidden mb-5">
+        <div className="bg-gray-200 rounded-2xl animate-pulse mb-2.5" style={{ height: '160px' }} />
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-gray-100 rounded-2xl animate-pulse" style={{ height: '90px' }} />
+          <div className="bg-gray-100 rounded-2xl animate-pulse" style={{ height: '90px' }} />
+          <div className="bg-gray-100 rounded-2xl animate-pulse" style={{ height: '90px' }} />
         </div>
       </div>
-      <div className="hidden md:grid md:grid-cols-3 gap-4 mb-5">
-        {[1, 2, 3].map((i) => (
+      <div className="hidden md:grid md:grid-cols-4 gap-4 mb-5">
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className={'h-36 rounded-2xl animate-pulse ' + (i === 1 ? 'bg-gray-200' : 'bg-gray-100')} />
         ))}
       </div>
@@ -192,18 +194,13 @@ function DashboardPage() {
   const [error,         setError]         = useState('');
   const [needsGoogleUrl, setNeedsGoogleUrl] = useState(false);
   const [unresolvedCount, setUnresolvedCount] = useState(0);
+  const [followUpCount,   setFollowUpCount]   = useState(0);
   const [businessPlan, setBusinessPlan] = useState(null);
   const [trialEndsAt, setTrialEndsAt] = useState(null);
-  const [googleBannerDismissed, setGoogleBannerDismissed] = useState(false);
   const [referralTotal, setReferralTotal] = useState(0);
+  const [productIntroSeen, setProductIntroSeen] = useState(null); // null = unknown yet
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('rb_dismiss_google_banner') === '1') {
-      setGoogleBannerDismissed(true);
-    }
-  }, []);
 
   // Total verified referrals -- quiet, all-time count for the summary card below.
   useEffect(() => {
@@ -223,6 +220,13 @@ function DashboardPage() {
         setNeedsGoogleUrl(!url);
         setBusinessPlan(res.data?.data?.plan ?? null);
         setTrialEndsAt(res.data?.data?.trial_ends_at ?? null);
+        // Only an explicit false (a genuinely new business, schema default
+        // applied at creation) shows the takeover. Staff and anything else
+        // (missing/undefined -- pre-existing businesses from before this
+        // field existed, which never got it retroactively) count as
+        // already seen, so no one already using the product gets ambushed.
+        const introSeen = res.data?.data?.product_intro_seen;
+        setProductIntroSeen(user?.role === 'owner' && introSeen === false ? false : true);
         const createdAt = res.data?.data?.created_at;
         if (createdAt && !localStorage.getItem('rb_dashboard_days')) {
           const ageDays = (Date.now() - new Date(createdAt)) / (1000 * 60 * 60 * 24);
@@ -237,6 +241,9 @@ function DashboardPage() {
     if (user?.role === 'super_admin') return;
     api.get('/reviews/private?page=1&limit=1')
       .then((res) => setUnresolvedCount(res.data?.totalUnresolved ?? 0))
+      .catch(() => { /* silent */ });
+    api.get('/follow-ups?status=due')
+      .then((res) => setFollowUpCount((res.data?.data || []).length))
       .catch(() => { /* silent */ });
   }, [user]);
 
@@ -338,10 +345,93 @@ function DashboardPage() {
       trend: calcTrend(mtd?.total_public ?? 0, lmtd?.total_public),
       trendSuffix,
     },
+    {
+      icon: '\uD83D\uDEA9', iconBg: 'bg-red-50',
+      label: 'Private Feedback',
+      value: summary?.total_private ?? 0,
+      trend: calcTrend(mtd?.total_private ?? 0, lmtd?.total_private),
+      trendSuffix,
+    },
   ];
 
+  var markIntroSeen = function() {
+    api.patch('/business/my-settings', { product_intro_seen: true }).catch(function() {});
+  };
+
+  var handleShowMeAround = function() {
+    markIntroSeen();
+    setProductIntroSeen(true);
+    if (typeof window !== 'undefined' && window.__rbStartHubTour) {
+      window.__rbStartHubTour();
+    }
+  };
+
+  var handleExploreMyself = function() {
+    markIntroSeen();
+    setProductIntroSeen(true);
+  };
+
   return (
-    <DashboardLayout>
+    <DashboardLayout showBack={false}>
+      {productIntroSeen === false && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h1 className="text-xl font-bold text-gray-900 mb-1">You're ready!</h1>
+            <p className="text-sm text-gray-500 mb-5">Your business is set up. Let's show you what you can do with ReviewBooster.</p>
+
+            <div className="grid grid-cols-3 gap-2.5 mb-5">
+              <div className="bg-gray-50 rounded-xl p-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center mb-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+                    <rect x="15" y="15" width="2.5" height="2.5" fill="#7C3AED" />
+                    <rect x="18.5" y="15" width="2.5" height="2.5" fill="#7C3AED" />
+                    <rect x="15" y="18.5" width="2.5" height="2.5" fill="#7C3AED" />
+                  </svg>
+                </div>
+                <p className="text-xs font-bold text-gray-900 leading-tight">Get more reviews</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center mb-2">
+                  <svg width="16" height="16" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1a4 4 0 100-8 4 4 0 000 8zm6 3a4 4 0 00-3-3.87" />
+                  </svg>
+                </div>
+                <p className="text-xs font-bold text-gray-900 leading-tight">Manage customers</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center mb-2">
+                  <svg width="16" height="16" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7h6v6" />
+                  </svg>
+                </div>
+                <p className="text-xs font-bold text-gray-900 leading-tight">Track performance</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={handleShowMeAround}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-colors"
+              >
+                {'Show me around \u2192'}
+              </button>
+              <button
+                type="button"
+                onClick={handleExploreMyself}
+                className="text-gray-400 hover:text-gray-600 font-semibold text-sm transition-colors shrink-0"
+              >
+                I'll explore myself
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 mb-4 text-red-500 text-xs">
           <span>{'\u26A0\uFE0F'}</span>
@@ -349,47 +439,7 @@ function DashboardPage() {
         </div>
       )}
 
-      {needsGoogleUrl && !googleBannerDismissed && (
-        <div className="flex items-center gap-2.5 bg-purple-50 border border-purple-200 rounded-xl px-3.5 py-2.5 mb-4">
-          <span className="text-base shrink-0">{'\u26A0\uFE0F'}</span>
-          <p className="flex-1 min-w-0 text-xs font-medium text-purple-700 truncate">
-            {'Add your Google Review link to enable redirects'}
-          </p>
-          <Link
-            href="/dashboard/settings/business-profile"
-            className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
-          >
-            Set it up
-          </Link>
-          <button
-            onClick={() => {
-              setGoogleBannerDismissed(true);
-              if (typeof window !== 'undefined') sessionStorage.setItem('rb_dismiss_google_banner', '1');
-            }}
-            className="shrink-0 text-purple-400 hover:text-purple-600 p-1"
-            aria-label="Dismiss"
-          >
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {unresolvedCount > 0 && (
-        <Link
-          href="/dashboard/feedback"
-          className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 hover:bg-red-100 transition-colors"
-        >
-          <span className="shrink-0 bg-red-500 text-white text-xs font-bold rounded-full min-w-[22px] h-[22px] flex items-center justify-center px-1.5">
-            {unresolvedCount > 99 ? '99+' : unresolvedCount}
-          </span>
-          <p className="text-sm font-semibold text-red-600 flex-1">
-            {unresolvedCount === 1 ? '1 piece of feedback needs your attention' : unresolvedCount + ' pieces of feedback need your attention'}
-          </p>
-          <span className="text-red-400 text-xs font-semibold shrink-0">View {'\u2192'}</span>
-        </Link>
-      )}
+      <NextActionBanner summary={summary} />
 
       {/* Greeting + date filter */}
       <div className="mb-5">
@@ -499,16 +549,18 @@ function DashboardPage() {
       {/* Data sections -- fade during period re-fetch */}
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
-        {/* Mobile: avg card + 2 mini cards */}
-        <div className="md:hidden grid grid-cols-2 gap-2.5 mb-5">
-          <AvgCard summary={summary} mtd={mtd} mobile />
-          <div className="flex flex-col gap-2 h-[250px]">
+        {/* Mobile: full-width avg card, 3 mini cards in a row below */}
+        <div data-tour="dashboard-stats" className="md:hidden mb-5">
+          <div className="mb-2.5">
+            <AvgCard summary={summary} mtd={mtd} mobile />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
             {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
           </div>
         </div>
 
-        {/* Desktop: flat 3-col row */}
-        <div className="hidden md:grid md:grid-cols-3 gap-4 mb-5">
+        {/* Desktop: flat 4-col row */}
+        <div data-tour="dashboard-stats" className="hidden md:grid md:grid-cols-4 gap-4 mb-5">
           <AvgCard summary={summary} mtd={mtd} />
           {miniCards.map((c) => <MiniCard key={c.label} {...c} />)}
         </div>
@@ -516,6 +568,7 @@ function DashboardPage() {
         {/* Primary action -- the one thing an owner needs to do fast, in
             front of a customer, every single time. */}
         <Link
+          id="tour-send-request-btn"
           href="/dashboard/send-request"
           className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm py-3.5 rounded-2xl mb-5 transition-colors shadow-sm"
         >
@@ -544,25 +597,35 @@ function DashboardPage() {
 
         {/* Quick Actions -- one card, a few compact rows, not a card each */}
         <p className="text-sm font-bold text-gray-800 mt-5 mb-2">Quick Actions</p>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-          <Link href="/dashboard/reviews" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">View Reviews</p>
-              <p className="text-[11px] text-gray-400">See customer feedback</p>
+        <div id="tour-quick-actions" className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+          <Link href="/dashboard/follow-ups" className={'flex items-center gap-3 px-4 py-3 transition-colors ' + (followUpCount > 0 ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/60')}>
+            <div className={'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ' + (followUpCount > 0 ? 'bg-red-100' : 'bg-gray-100')}>
+              <svg width="16" height="16" fill="none" stroke={followUpCount > 0 ? '#DC2626' : '#9CA3AF'} strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
-            <span className="text-gray-300 shrink-0">{'\u2192'}</span>
-          </Link>
-          <Link href="/dashboard/feedback" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <path d="M4 22v-7" strokeLinecap="round" />
-            </svg>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">Check Private Feedback</p>
-              <p className="text-[11px] text-gray-400">
+              <p className={'text-sm font-medium ' + (followUpCount > 0 ? 'text-red-700' : 'text-gray-800')}>Needs Followup</p>
+              <p className={'text-[11px] ' + (followUpCount > 0 ? 'text-red-400' : 'text-gray-400')}>
+                {followUpCount > 0 ? followUpCount + ' due' : 'All caught up'}
+              </p>
+            </div>
+            {followUpCount > 0 && (
+              <span className="shrink-0 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {followUpCount > 99 ? '99+' : followUpCount}
+              </span>
+            )}
+          </Link>
+          <Link href="/dashboard/feedback" className={'flex items-center gap-3 px-4 py-3 transition-colors ' + (unresolvedCount > 0 ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/60')}>
+            <div className={'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ' + (unresolvedCount > 0 ? 'bg-red-100' : 'bg-gray-100')}>
+              <svg width="16" height="16" fill="none" stroke={unresolvedCount > 0 ? '#DC2626' : '#9CA3AF'} strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                <path d="M4 22v-7" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={'text-sm font-medium ' + (unresolvedCount > 0 ? 'text-red-700' : 'text-gray-800')}>Check Private Feedback</p>
+              <p className={'text-[11px] ' + (unresolvedCount > 0 ? 'text-red-400' : 'text-gray-400')}>
                 {unresolvedCount > 0 ? unresolvedCount + ' need attention' : 'All caught up'}
               </p>
             </div>
@@ -573,13 +636,27 @@ function DashboardPage() {
             )}
           </Link>
           <Link href="/dashboard/analytics" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
-            <svg width="18" height="18" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24" className="shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
-              <path d="M15 7h6v6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+              <svg width="16" height="16" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" />
+                <path d="M15 7h6v6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800">View Analytics</p>
               <p className="text-[11px] text-gray-400">Track your growth</p>
+            </div>
+            <span className="text-gray-300 shrink-0">{'\u2192'}</span>
+          </Link>
+          <Link href="/dashboard/reviews" className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-100">
+              <svg width="16" height="16" fill="none" stroke="#9CA3AF" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800">View Reviews</p>
+              <p className="text-[11px] text-gray-400">See customer feedback</p>
             </div>
             <span className="text-gray-300 shrink-0">{'\u2192'}</span>
           </Link>

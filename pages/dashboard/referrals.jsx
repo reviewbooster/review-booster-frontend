@@ -1,6 +1,6 @@
-/**
+﻿/**
  * pages/dashboard/referrals.jsx
- * "Redeem a Referral" — the only place referral attribution actually
+ * "Redeem a Referral" â€” the only place referral attribution actually
  * happens. Staff type the code a walk-in customer shows them, confirm who
  * referred them, and record the new customer. Also surfaces which
  * customers have earned a reward, and lets the owner edit the program's
@@ -121,7 +121,7 @@ function RedeemCard() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+    <div id="tour-referral-redeem" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
       <h2 className="text-sm font-bold text-gray-900 mb-1">Redeem a Referral</h2>
       <p className="text-xs text-gray-400 mb-4">Enter the code the customer shows you at checkout.</p>
 
@@ -539,7 +539,7 @@ function ReferrersCard() {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+    <div id="tour-referral-top" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
       <h2 className="text-sm font-bold text-gray-900 mb-1">Top Referrers</h2>
       <p className="text-xs text-gray-400 mb-4">Everyone who has referred at least one customer, ranked by points.</p>
 
@@ -585,6 +585,16 @@ function ReferralsPage() {
   const isOwner = user?.role === 'owner';
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [businessType, setBusinessType] = useState(null);
+
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_referrals') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('referrals');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
 
   useEffect(() => {
     api.get('/business/my-settings')

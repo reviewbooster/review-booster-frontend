@@ -1,13 +1,15 @@
-/**
+﻿/**
  * pages/dashboard/reviews-hub.jsx
  * Reviews hub -- landing page for the Reviews section of the nav.
- * Cards out to Customers, QR Code, Reviews, and Feedback.
+ * Cards out to QR Code, Reviews, and Feedback. (Customers moved to its own
+ * top-level nav item.)
  */
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
+import InfoButton from '../../components/InfoButton';
 import api from '../../lib/api';
 
 function HubCard({ href, icon, title, description, badge }) {
@@ -46,32 +48,49 @@ function ReviewsHubPage() {
 
   return (
     <DashboardLayout>
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-900 leading-tight">Reviews</h1>
-        <p className="text-[13px] text-gray-400 mt-0.5">Everything about collecting and managing reviews.</p>
+      <div className="mb-5 flex items-start gap-2">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 leading-tight">Reviews</h1>
+          <p className="text-[13px] text-gray-400 mt-0.5">Everything about collecting and managing reviews.</p>
+        </div>
+        <InfoButton title="Reviews" autoShowKey="reviews">
+          This is where you collect customer feedback and guide happy customers toward leaving a public Google review. Your QR code is how customers get here, Google Reviews shows what they've posted publicly, and Feedback is for the private complaints that need your attention first.
+        </InfoButton>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <HubCard
-          href="/dashboard/customers"
-          icon={'\uD83D\uDC65'}
-          title="Customers"
-          description="Manage customers and send review requests"
-        />
-        <HubCard
           href="/dashboard/qr"
-          icon={'\u25A3'}
+          icon={
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+              <rect x="14" y="3" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+              <rect x="3" y="14" width="7" height="7" rx="1" stroke="#7C3AED" strokeWidth="1.8" />
+              <rect x="15" y="15" width="2.5" height="2.5" fill="#7C3AED" />
+              <rect x="18.5" y="15" width="2.5" height="2.5" fill="#7C3AED" />
+              <rect x="15" y="18.5" width="2.5" height="2.5" fill="#7C3AED" />
+            </svg>
+          }
           title="QR Code"
           description="Show or share your review QR code"
         />
         <HubCard
           href="/dashboard/reviews"
-          icon={'\u2605'}
+          icon={
+            <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          }
           title="Google Reviews"
           description="See the reviews you've received"
         />
         <HubCard
           href="/dashboard/feedback"
-          icon={'\u2691'}
+          icon={
+            <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+              <path d="M4 22v-7" strokeLinecap="round" />
+            </svg>
+          }
           title="Feedback"
           description="Private feedback from unhappy customers"
           badge={unresolvedCount}

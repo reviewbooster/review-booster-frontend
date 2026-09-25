@@ -33,6 +33,16 @@ function MessageTemplatesPage() {
   const { user } = useAuth();
   const isStaff = user?.role === 'staff';
 
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_templates') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('templates');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState({ review_request: '', thank_refer: '', resolved_followup: '' });
   const [templatesError, setTemplatesError] = useState('');
@@ -104,7 +114,7 @@ function MessageTemplatesPage() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             {templatesError && <div className='alert-error'><span>{'\u26A0'}</span><span>{templatesError}</span></div>}
-            <div>
+            <div id="tour-template-review-request">
               <label className="label">Review Request Message</label>
               <div className="flex items-center gap-1.5 mb-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 w-fit">
                 <span className='text-gray-400'>{'\uD83D\uDD12'}</span>
@@ -162,7 +172,7 @@ function MessageTemplatesPage() {
               </div>
               <p className="text-[10px] text-gray-400 mt-1.5">Sent when you tap Resend Request on feedback you have already resolved \u2014 nudges them to consider updating their rating.</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div id="tour-template-save" className="flex items-center gap-3">
               <button type="button" onClick={handleSaveTemplates} disabled={templatesSaving}
                 className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors">
                 {templatesSaving ? 'Saving...' : 'Save Templates'}</button>

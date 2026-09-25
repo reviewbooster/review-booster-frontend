@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
@@ -24,12 +24,17 @@ const OWNER_NAV_TOP = [
     badge: true,
     matchPrefixes: [
       "/dashboard/reviews-hub",
-      "/dashboard/customers",
       "/dashboard/qr",
       "/dashboard/reviews",
       "/dashboard/feedback",
       "/dashboard/send-request",
     ],
+  },
+  {
+    href: "/dashboard/customers",
+    icon: "\uD83D\uDC65",
+    label: "Customers",
+    matchPrefixes: ["/dashboard/customers"],
   },
   {
     href: "/dashboard/growth-hub",
@@ -54,7 +59,6 @@ const OWNER_NAV_TOP = [
 const ADMIN_NAV = [
   { href: "/dashboard/admin/dashboard",    icon: "\uD83D\uDCCA", label: "Dashboard",    mobileLabel: "Dashboard", activeClass: "bg-purple-50 text-purple-600" },
   { href: "/dashboard/admin",              icon: "\uD83C\uDFE2", label: "Businesses",   mobileLabel: "Businesses", activeClass: "bg-blue-50 text-blue-600" },
-  { href: "/dashboard/admin/approvals",    icon: "\u2713",        label: "Approvals",    mobileLabel: "Approvals", activeClass: "bg-green-50 text-green-600",  pendingBadge: true },
   { href: "/dashboard/requests",           icon: "\uD83D\uDD13", label: "Requests",     mobileLabel: "Requests",  activeClass: "bg-amber-50 text-amber-600", count: true },
 ];
 
@@ -74,7 +78,6 @@ const ADMIN_NAV_GROUPS = [
     { href: "/dashboard/admin?modal=referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
   ]},
   { header: "Operations", items: [
-    { href: "/dashboard/admin/approvals", icon: "\u2713", label: "Approvals" },
     { href: "/dashboard/requests", icon: "\uD83D\uDD13", label: "Requests" },
   ]},
   { header: "System", items: [
@@ -245,6 +248,7 @@ function SettingsGearIcon({ active }) {
 const TOP_NAV_ICONS = {
   "/dashboard":               HomeIcon,
   "/dashboard/reviews-hub":   StarNavIcon,
+  "/dashboard/customers":     UsersIcon,
   "/dashboard/growth-hub":    GrowthIcon,
   "/dashboard/settings-hub":  SettingsGearIcon,
 };
@@ -276,7 +280,6 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount,       setUnreadCount]       = useState(0);
   const [notifToast,        setNotifToast]        = useState(false);
-  const [pendingCount,      setPendingCount]      = useState(0);
   const prevUnreadRef   = useRef(null);
   const toastTimeoutRef = useRef(null);
 
@@ -301,19 +304,6 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       clearInterval(timer);
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
-  }, [user]);
-
-  useEffect(function() {
-    if (!user || user.role !== 'super_admin') return;
-    var fetchPending = async function() {
-      try {
-        var res = await api.get('/admin/pending-count');
-        setPendingCount(res.data.count || 0);
-      } catch (e) { /* silent */ }
-    };
-    fetchPending();
-    var timer = setInterval(fetchPending, 60000);
-    return function() { clearInterval(timer); };
   }, [user]);
 
   function toggleNotifications() {
@@ -357,6 +347,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               key={item.href}
               href={item.href}
               onClick={onItemClick}
+              data-tour-nav={item.href}
               className={"flex items-center gap-3 px-3 " + itemPaddingClass + " rounded-lg text-sm font-medium transition-all duration-150 " +
                 (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
             >
@@ -377,7 +368,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
   return (
     <>
       {/* -------- DESKTOP SIDEBAR -------- */}
-      <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 bg-white border-r border-gray-100 flex-col z-30">
+      <aside id="desktop-sidebar" className="hidden md:flex fixed inset-y-0 left-0 w-60 bg-white border-r border-gray-100 flex-col z-30">
 
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex items-center justify-between">
@@ -413,9 +404,9 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               return (
                 <div key={group.header} className="mb-3 last:mb-0">
                   <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.header}</p>
-                  {group.items.map(function({ href, icon, label, count, pendingBadge }) {
+                  {group.items.map(function({ href, icon, label, count }) {
                     var active    = isAdminActive(href);
-                    var itemCount = count ? resetRequestCount : (pendingBadge ? pendingCount : 0);
+                    var itemCount = count ? resetRequestCount : 0;
                     return (
                       <Link
                         key={href}
@@ -490,6 +481,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
             onClick={function() { setDrawerOpen(true); }}
             className="text-gray-500 hover:text-gray-700 transition-colors"
             aria-label="Menu"
+            data-tour-nav="/dashboard/settings-hub"
           >
             <HamburgerIcon />
           </button>
@@ -550,9 +542,9 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       >
         {user?.role === "super_admin" ? (
           <div className="flex justify-around w-full py-1">
-            {ADMIN_NAV.map(function({ href, icon, mobileLabel, count, pendingBadge }) {
+            {ADMIN_NAV.map(function({ href, icon, mobileLabel, count }) {
               var active    = isAdminActive(href);
-              var itemCount = count ? resetRequestCount : (pendingBadge ? pendingCount : 0);
+              var itemCount = count ? resetRequestCount : 0;
               return (
                 <Link
                   key={href}
@@ -581,6 +573,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour-nav={item.href}
                   className={"relative flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors " +
                     (active ? "text-purple-600" : "text-gray-400")}
                 >
@@ -615,6 +608,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour-nav={item.href}
                   className={"relative flex flex-col items-center justify-center flex-1 py-2 gap-0.5 transition-colors " +
                     (active ? "text-purple-600" : "text-gray-400")}
                 >
@@ -654,9 +648,9 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               return (
                 <div key={group.header} className="mb-3 last:mb-0">
                   <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.header}</p>
-                  {group.items.map(function({ href, icon, label, count, pendingBadge }) {
+                  {group.items.map(function({ href, icon, label, count }) {
                     var active    = isAdminActive(href);
-                    var itemCount = count ? resetRequestCount : (pendingBadge ? pendingCount : 0);
+                    var itemCount = count ? resetRequestCount : 0;
                     return (
                       <Link
                         key={href}

@@ -1,16 +1,17 @@
-var DEFAULT_REVIEW_TEMPLATE = 'Hi {{name}}, please take a moment to share your feedback. It only takes 30 seconds!\n\n{{link}}';
+﻿var DEFAULT_REVIEW_TEMPLATE = 'Hi {{name}}, please take a moment to share your feedback. It only takes 30 seconds!\n\n{{link}}';
 /**
  * pages/dashboard/customers.jsx
  * Customers page  --  Phase 2 + CSV import (S16) + Edit customer + details nav (S17).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import StaffPicker from '../../components/StaffPicker';
+import InfoButton from '../../components/InfoButton';
 import { getDefaultTemplates } from '../../lib/defaultMessageTemplates';
 import { waLinkProps } from '../../lib/waLink';
 import { getNotesLabel } from '../../lib/industryFieldLabels';
@@ -819,6 +820,16 @@ function ImportModal({ onClose, onImported }) {
 function CustomersPage() {
   const router = useRouter();
   const { user } = useAuth();
+  useEffect(function() { localStorage.setItem('rb_visited_customers', '1'); }, []);
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_customers') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('customers');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
   const isStaff = user?.role === 'staff';
 
   const [customers,    setCustomers]    = useState([]);
@@ -905,7 +916,10 @@ function CustomersPage() {
     }).catch(function() {});
   }, []);
 
+  const loadRequestId = useRef(0);
+
   const load = useCallback(async () => {
+    const thisRequestId = ++loadRequestId.current;
     setLoading(true);
     setError('');
     try {
@@ -915,12 +929,13 @@ function CustomersPage() {
       if (tagFilter)           params.set('tag', tagFilter);
       if (followupFilter)      params.set('due_followup', 'true');
       const { data } = await api.get('/customers?' + params.toString());
+      if (thisRequestId !== loadRequestId.current) return; // a newer request has already fired -- discard this stale response
       setCustomers(data.data ?? []);
       setTotal(data.total ?? 0);
     } catch {
-      setError('Failed to load customers.');
+      if (thisRequestId === loadRequestId.current) setError('Failed to load customers.');
     } finally {
-      setLoading(false);
+      if (thisRequestId === loadRequestId.current) setLoading(false);
     }
   }, [page, search, activeTab, sort, tagFilter, followupFilter]);
 
@@ -1063,7 +1078,12 @@ function CustomersPage() {
 
       <div className="mb-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h1 className="text-xl font-bold text-gray-900 shrink-0">Customers</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <h1 className="text-xl font-bold text-gray-900">Customers</h1>
+            <InfoButton title="Customers">
+              Keep customer activity, feedback, and follow-ups organized in one place. Every customer who scans your QR code or gets added manually shows up here, along with their review history, any private feedback they've left, and whether they need a follow-up.
+            </InfoButton>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             <div className="relative">
               <button
@@ -1108,6 +1128,7 @@ function CustomersPage() {
             </div>
             {!isStaff && (
               <button
+                id="tour-add-customer"
                 onClick={() => setShowAdd(true)}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#7C3AED' }}
@@ -1269,7 +1290,7 @@ function CustomersPage() {
 
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
+      <div id="tour-customers-list" className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 last:border-0">

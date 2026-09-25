@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/analytics.jsx
  * Analytics -- Review Funnel, Reviews Over Time chart, and the private
  * feedback resolved/unresolved breakdown. Split out of the Home dashboard
@@ -94,6 +94,16 @@ function DashboardPage() {
   const [error,         setError]         = useState('');
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
+
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_analytics') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('analytics');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -300,7 +310,7 @@ function DashboardPage() {
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
         {/* Summary strip -- headline numbers before the detailed funnel/chart below */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+        <div id="tour-analytics-summary" className="bg-white rounded-2xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
           <div className="grid grid-cols-4 divide-x divide-gray-100">
             <div className="px-3 md:px-4 py-3">
               <p className="text-[10px] text-gray-400 mb-1 leading-none">Requests Sent</p>
@@ -333,7 +343,7 @@ function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Review Funnel */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+          <div id="tour-analytics-funnel" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[13px] font-bold text-gray-800">Review Funnel</h2>
               <Link href="/dashboard/reviews" className="text-[11px] font-semibold text-purple-600 hover:underline">

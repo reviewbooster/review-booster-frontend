@@ -79,8 +79,6 @@ function bucketOfStage(stage) {
 }
 
 var STAGE_OPTIONS = [
-  { key: 'new',                   label: 'New' },
-  { key: 'processing',            label: 'Processing' },
   { key: 'awaiting_confirmation', label: 'Awaiting Confirmation' },
 ];
 
@@ -610,9 +608,9 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
           )}
 
           {status !== 'Resolved' && (
-            <div className="mb-3">
-              <p className="text-xs font-semibold text-gray-500 mb-1.5">Stage</p>
-              <div className="flex gap-1.5">
+            <>
+              <StaffPicker value={resolvedBy} onChange={setResolvedBy} label="Who's handling this? (optional)" />
+              <div className="mb-2 flex gap-2">
                 {STAGE_OPTIONS.map(function(s) {
                   var isCurrent = (item.stage || 'new') === s.key;
                   return (
@@ -626,27 +624,22 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                         }
                       }}
                       disabled={updatingStage}
-                      className={'flex-1 text-[10px] font-semibold py-2 px-1 rounded-lg transition-colors ' +
-                        (isCurrent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200')}
+                      className={'flex-1 text-xs font-semibold py-2.5 rounded-xl transition-colors ' +
+                        (isCurrent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
                     >
                       {s.label}
                     </button>
                   );
                 })}
+                {onResolve && (
+                  <button
+                    onClick={function() { onResolve(item._id, resolvedBy); }}
+                    disabled={resolving === item._id}
+                    className="flex-1 text-xs font-semibold py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors flex items-center justify-center gap-1.5">
+                    {resolving === item._id ? <><span className="spinner" />{' Marking\u2026'}</> : '\u2713 Mark as Resolved'}
+                  </button>
+                )}
               </div>
-            </div>
-          )}
-
-          {/* Resolve + Close */}
-          {status !== 'Resolved' && onResolve && (
-            <>
-              <StaffPicker value={resolvedBy} onChange={setResolvedBy} label="Who's handling this? (optional)" />
-              <button
-                onClick={function() { onResolve(item._id, resolvedBy); }}
-                disabled={resolving === item._id}
-                className="w-full text-sm font-semibold py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors mb-2 flex items-center justify-center gap-1.5">
-                {resolving === item._id ? <><span className="spinner" />{' Marking\u2026'}</> : '\u2713 Mark as Resolved'}
-              </button>
             </>
           )}
           {!isStaff && status === 'Resolved' && (
@@ -677,6 +670,16 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
 // -- Main page ----------------------------------------------------------------
 function FeedbackPage() {
   const { user } = useAuth();
+  useEffect(function() { localStorage.setItem('rb_visited_feedback', '1'); }, []);
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_feedback') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('feedback');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
   const isStaff = user?.role === 'staff';
   const [activeTab,   setActiveTab]   = useState('new');
   const [items,       setItems]       = useState([]);
@@ -942,7 +945,7 @@ function FeedbackPage() {
   ];
 
   return (
-    <DashboardLayout>
+    <DashboardLayout title="Private Feedback" subtitle="Customer feedback that needs your attention">
 
       {viewItem && (
         <FeedbackDetailModal
@@ -1012,7 +1015,7 @@ function FeedbackPage() {
       )}
 
       {/* Tab bar */}
-      <div className="flex items-center border-b border-gray-200 mb-4">
+      <div id="tour-feedback-tabs" className="flex items-center border-b border-gray-200 mb-4">
         <div className="flex flex-1">
           {TABS.map(function(tab) {
             return (
@@ -1231,11 +1234,12 @@ function FeedbackPage() {
             </p>
           </div>
         ) : (
-          items.map(function(r) {
+          items.map(function(r, idx) {
             var status     = getStatus(r);
             var isResolved = status === 'Resolved';
             return (
               <div key={r._id}
+                id={idx === 0 ? 'tour-feedback-first-card' : undefined}
                 className="flex items-start gap-3 px-4 py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100">
 
                 <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-sm shrink-0 mt-0.5">

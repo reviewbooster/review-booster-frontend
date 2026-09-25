@@ -1,14 +1,15 @@
-/**
+﻿/**
  * pages/dashboard/team.jsx
  * Owner-only. Two sections on one page (previously split across
  * /dashboard/team and /dashboard/staff-performance):
- *   1. Team Accounts — real logins (owner/staff), full access control.
+ *   1. Team Accounts â€” real logins (owner/staff), full access control.
  *      Collapsed by default (most businesses only need Staff Directory).
- *   2. Staff Performance — the lightweight, no-login Staff Directory,
+ *   2. Staff Performance â€” the lightweight, no-login Staff Directory,
  *      merged with its performance numbers, plus search + sort.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import QRCode from 'react-qr-code';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
@@ -16,6 +17,120 @@ import api from '../../lib/api';
 function fmtDate(d) {
   if (!d) return '\u2014';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// -- Staff QR Codes -------------------------------------------------------
+// Each staff-directory member can have their own QR that auto-attributes
+// the resulting review request to them -- no picker needed, good for a
+// sticker at their own chair/station. Same design as the business QR's own
+// print templates, just staff-scoped.
+function drawStaffCard(ctx, W, H, businessName, staffName, qrImg) {
+  ctx.clearRect(0, 0, W, H);
+  var g = ctx.createLinearGradient(0, 0, W*0.4, H);
+  g.addColorStop(0, '#7C3AED');
+  g.addColorStop(1, '#4F46E5');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.beginPath(); ctx.arc(Math.round(W*0.85), Math.round(H*0.08), Math.round(W*0.25), 0, Math.PI*2); ctx.fill();
+
+  var shortBiz = businessName.length > 16 ? businessName.substring(0, 16) + '...' : businessName;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold ' + Math.round(W*0.078) + 'px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(shortBiz, W/2, Math.round(H*0.11));
+
+  ctx.fillStyle = 'rgba(255,255,255,0.68)';
+  ctx.font = Math.round(W*0.042) + 'px Arial';
+  ctx.fillText('Scan to share your feedback', W/2, Math.round(H*0.17));
+
+  var pad = Math.round(W*0.09);
+  var cY  = Math.round(H*0.22);
+  var cH  = Math.round(H*0.54);
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, pad, cY, W-pad*2, cH, Math.round(W*0.05));
+  ctx.fill();
+  var qrP = Math.round((W-pad*2)*0.82);
+  ctx.drawImage(qrImg, Math.round((W-qrP)/2), cY + Math.round((cH-qrP)/2), qrP, qrP);
+
+  var shortStaff = staffName.length > 16 ? staffName.substring(0, 16) + '...' : staffName;
+  ctx.fillStyle = '#FCD34D';
+  ctx.font = 'bold ' + Math.round(W*0.06) + 'px Arial';
+  ctx.fillText(shortStaff, W/2, Math.round(H*0.87));
+
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = Math.round(W*0.03) + 'px Arial';
+  ctx.fillText('Powered by ReviewBooster', W/2, Math.round(H*0.95));
+}
+
+function StaffQrCard({ staffMember, baseQrUrl, businessName, onCopy, copied }) {
+  const canvasRef = useRef(null);
+  const svgId = 'staff-qr-svg-' + staffMember._id;
+
+  useEffect(function() {
+    var canvas = canvasRef.current;
+    if (!canvas) return;
+    var svgEl = document.getElementById(svgId);
+    if (!svgEl) return;
+    var W = 280, H = 360;
+    canvas.width = W; canvas.height = H;
+    var svgData = new XMLSerializer().serializeToString(svgEl);
+    var blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    var burl = URL.createObjectURL(blob);
+    var img  = new Image();
+    img.onload = function() {
+      drawStaffCard(canvas.getContext('2d'), W, H, businessName, staffMember.name, img);
+      URL.revokeObjectURL(burl);
+    };
+    img.src = burl;
+  }, [staffMember._id, businessName]);
+
+  function handleDownload() {
+    if (!canvasRef.current) return;
+    var link = document.createElement('a');
+    link.href     = canvasRef.current.toDataURL('image/png');
+    link.download = (businessName || 'staff').replace(/\s+/g, '-').toLowerCase() + '-' + staffMember.name.replace(/\s+/g, '-').toLowerCase() + '-qr.png';
+    link.click();
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1.5 pt-3">
+      {!baseQrUrl ? (
+        <p className="text-xs text-gray-400 py-4">{'Loading QR\u2026'}</p>
+      ) : (
+        <>
+          <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+            <QRCode id={svgId} value={baseQrUrl + '?staff=' + staffMember._id} size={190} level="H" fgColor="#111827" bgColor="#ffffff" />
+          </div>
+          <div className="w-full max-w-[180px] overflow-hidden rounded-xl shadow-sm">
+            <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block' }} />
+          </div>
+          <div className="flex gap-3">
+            <button onClick={function() { onCopy(staffMember._id); }} className="text-[10px] font-semibold text-purple-600 hover:underline">
+              {copied ? 'Copied' : 'Copy Link'}
+            </button>
+            <button onClick={handleDownload} className="text-[10px] font-semibold text-purple-600 hover:underline">
+              Download
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function AddStaffAccountModal({ onClose, onCreated }) {
@@ -100,6 +215,30 @@ function TeamPage() {
   const [directoryError,   setDirectoryError]    = useState('');
   const [search,           setSearch]            = useState('');
   const [sortKey,          setSortKey]           = useState('name_asc');
+  const [qrData,           setQrData]            = useState(null);
+  const [expandedQrId,     setExpandedQrId]      = useState(null);
+  const [copiedQrId,       setCopiedQrId]        = useState(null);
+
+  useEffect(function() {
+    api.get('/business/my-qr').then(function(res) {
+      setQrData(res.data && res.data.data ? res.data.data : null);
+    }).catch(function() {});
+  }, []);
+
+  var baseQrUrl = (qrData && typeof window !== 'undefined')
+    ? window.location.origin + '/qr/' + qrData.qr_token
+    : '';
+
+  function toggleQr(staffId) {
+    setExpandedQrId(function(prev) { return prev === staffId ? null : staffId; });
+  }
+
+  function handleCopyQr(staffId) {
+    navigator.clipboard.writeText(baseQrUrl + '?staff=' + staffId).then(function() {
+      setCopiedQrId(staffId);
+      setTimeout(function() { setCopiedQrId(null); }, 2000);
+    }).catch(function() {});
+  }
 
   const loadDirectory = async () => {
     setDirectoryLoading(true);
@@ -113,7 +252,7 @@ function TeamPage() {
       (results[1].data.data ?? []).forEach(function(s) { map[s.name] = s; });
       setStatsByName(map);
     } catch (e) {
-      // silent — this section is optional, don't block the page over it
+      // silent â€” this section is optional, don't block the page over it
     } finally {
       setDirectoryLoading(false);
     }
@@ -216,7 +355,7 @@ function TeamPage() {
         <div className="alert-success mb-4"><span>{'\u2713'}</span><span>{toast}</span></div>
       )}
 
-      {/* -- Section 1: Team Accounts (real logins) — collapsed by default --- */}
+      {/* -- Section 1: Team Accounts (real logins) â€” collapsed by default --- */}
       <button
         onClick={() => setShowTeamAccounts(function(v) { return !v; })}
         className="w-full flex items-center justify-between py-2 mb-1"
@@ -355,33 +494,54 @@ function TeamPage() {
           </div>
         ) : (
           visibleDirectory.map(function(s) {
+            var isQrOpen = expandedQrId === s._id;
             return (
-              <div key={s._id} className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 last:border-0 gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-xs shrink-0">
-                    {s.name.charAt(0).toUpperCase()}
+              <div key={s._id} className="border-b border-gray-100 last:border-0">
+                <div className="flex items-center justify-between px-5 py-3.5 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-xs shrink-0">
+                      {s.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
+                      {s.has_data ? (
+                        <p className="text-[11px] text-gray-400">
+                          {s.customers_handled + ' handled \u00b7 '}
+                          <span className="text-green-600 font-semibold">{s.positive_pct + '% positive'}</span>
+                          {' \u00b7 ' + s.reviews_generated + ' reviews'}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-gray-400">
+                          {s.customers_handled + ' handled \u00b7 not enough data yet'}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
-                    {s.has_data ? (
-                      <p className="text-[11px] text-gray-400">
-                        {s.customers_handled + ' handled \u00b7 '}
-                        <span className="text-green-600 font-semibold">{s.positive_pct + '% positive'}</span>
-                        {' \u00b7 ' + s.reviews_generated + ' reviews'}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-gray-400">
-                        {s.customers_handled + ' handled \u00b7 not enough data yet'}
-                      </p>
-                    )}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={function() { toggleQr(s._id); }}
+                      className={'text-xs font-semibold transition-colors ' + (isQrOpen ? 'text-purple-600' : 'text-gray-400 hover:text-purple-600')}>
+                      QR
+                    </button>
+                    <button
+                      onClick={function() { handleRemoveDirEntry(s._id); }}
+                      disabled={removingDirId === s._id}
+                      className="text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 transition-colors">
+                      {removingDirId === s._id ? 'Removing...' : 'Remove'}
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={function() { handleRemoveDirEntry(s._id); }}
-                  disabled={removingDirId === s._id}
-                  className="shrink-0 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50 transition-colors">
-                  {removingDirId === s._id ? 'Removing...' : 'Remove'}
-                </button>
+                {isQrOpen && (
+                  <div className="px-5 pb-4 flex justify-center">
+                    <StaffQrCard
+                      staffMember={s}
+                      baseQrUrl={baseQrUrl}
+                      businessName={qrData && qrData.business_name}
+                      onCopy={handleCopyQr}
+                      copied={copiedQrId === s._id}
+                    />
+                  </div>
+                )}
               </div>
             );
           })

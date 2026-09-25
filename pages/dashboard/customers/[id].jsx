@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/customers/[id].jsx
  * Customer Profile -- redesigned around the mockup: quick actions,
  * contact info, and a single chronological activity timeline instead of
@@ -74,18 +74,15 @@ function ChannelBadge({ channel }) {
 }
 
 function buildLink(channel, customer, reviewUrl) {
-  var msg = 'Hi ' + customer.name + ', please take a moment to share your feedback. It only takes 30 seconds! ' + reviewUrl;
   if (channel === 'whatsapp') {
     var phone = customer.phone.replace(/^\+/, '');
-    return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+    return 'https://wa.me/' + phone;
   }
   if (channel === 'sms') {
-    return 'sms:' + customer.phone + '?body=' + encodeURIComponent(msg);
+    return 'sms:' + customer.phone;
   }
   if (channel === 'email') {
-    return 'mailto:' + customer.email +
-      '?subject=' + encodeURIComponent('We would love your feedback!') +
-      '&body=' + encodeURIComponent(msg);
+    return 'mailto:' + customer.email + '?subject=' + encodeURIComponent('We would love your feedback!');
   }
   return reviewUrl;
 }
@@ -450,6 +447,16 @@ function CustomerDetailPage() {
   var router = useRouter();
   var { id } = router.query;
 
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_customer-detail') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('customer-detail');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
+
   var [customer, setCustomer]   = useState(null);
   var [businessType, setBusinessType] = useState(null);
   var [requests, setRequests]   = useState([]);
@@ -480,9 +487,10 @@ function CustomerDetailPage() {
     }
   };
 
-  var fetchAll = async function () {
+  var fetchAll = async function (opts) {
+    var silent = opts && opts.silent;
     if (!id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError('');
     try {
       var [cRes, rqRes, rvRes, fuRes] = await Promise.all([
@@ -497,9 +505,9 @@ function CustomerDetailPage() {
       setFollowUp(fuRes.data.data || null);
       setFollowUpLoaded(true);
     } catch (_) {
-      setError('Failed to load customer details.');
+      if (!silent) setError('Failed to load customer details.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -610,7 +618,7 @@ function CustomerDetailPage() {
         <SendRequestModal
           customer={customer}
           onClose={() => setSendOpen(false)}
-          onSent={() => { fetchAll(); showToast('Review link ready!'); }} />
+          onSent={() => { fetchAll({ silent: true }); showToast('Review link ready!'); }} />
       )}
       {deleteOpen && (
         <DeleteConfirmModal
@@ -678,7 +686,7 @@ function CustomerDetailPage() {
         </span>
 
         {/* Quick actions */}
-        <div className="grid grid-cols-3 gap-2 w-full mt-5">
+        <div id="tour-customer-actions" className="grid grid-cols-3 gap-2 w-full mt-5">
           <button
             onClick={() => setSendOpen(true)}
             disabled={customer.opted_out}
@@ -744,7 +752,7 @@ function CustomerDetailPage() {
       </div>
 
       {/* Next follow-up */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+      <div id="tour-customer-followup" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
         <div className="flex items-center justify-between mb-1">
           <p className="text-sm font-bold text-gray-900">Next follow-up</p>
           {followUpLoaded && (

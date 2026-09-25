@@ -189,6 +189,16 @@ function ReviewsPage() {
   const [thankReferTemplate, setThankReferTemplate] = useState('');
 
   useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_reviews') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('reviews');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(function() {
     api.get('/business/my-settings').then(function(res) {
       var biz = res.data && res.data.data;
       var mt = biz && biz.message_templates;
@@ -357,6 +367,10 @@ function ReviewsPage() {
     if (!r.customer_id || !r.customer_id.phone || referringId) return;
     setReferringId(r._id);
     setThankReferLink(null);
+    // Opened synchronously, before any await, so this still counts as a
+    // direct response to the tap rather than a blocked popup -- we fill in
+    // its destination once the WhatsApp URL is actually ready.
+    var tab = window.open('', '_blank', 'noopener,noreferrer');
     try {
       var res = await api.get('/referrals/customer/' + r.customer_id._id);
       var link = window.location.origin + '/ref/' + res.data.data.code + '?owner=1';
@@ -370,8 +384,17 @@ function ReviewsPage() {
         referral_reward:    (refSettings && refSettings.reward_text) || 'a reward',
         referral_offer:     (refSettings && refSettings.offer_text)  || 'a special offer',
       });
-      setThankReferLink({ id: r._id, url: 'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg) });
-    } catch (_) {}
+      var waUrl = 'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg);
+      if (tab) {
+        tab.location.href = waUrl;
+      } else {
+        // Popup was blocked despite our best effort -- fall back to a
+        // tappable link instead of silently failing.
+        setThankReferLink({ id: r._id, url: waUrl });
+      }
+    } catch (_) {
+      if (tab) tab.close();
+    }
     setReferringId(null);
   };
 
@@ -644,7 +667,7 @@ function ReviewsPage() {
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
       {/* Reviews list */}
-      <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
+      <div id="tour-review-list" className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
         (fetching ? 'opacity-50 pointer-events-none' : '')}>
         {loading ? (
           Array.from({ length: 5 }).map(function(_, i) {
@@ -674,6 +697,7 @@ function ReviewsPage() {
           reviews.map(function(r, i) {
             return (
               <div key={r._id}
+                id={i === 0 ? 'tour-review-first-card' : undefined}
                 className="flex items-start gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100">
 
                 <div

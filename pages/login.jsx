@@ -265,9 +265,6 @@ export default function LoginPage() {
         router.replace('/dashboard');
       }
     } catch (err) {
-      const code = err.response?.data?.code;
-      if (code === 'PENDING_APPROVAL') { router.replace('/pending-approval'); return; }
-      if (code === 'ACCOUNT_REJECTED') { router.replace('/account-rejected'); return; }
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);

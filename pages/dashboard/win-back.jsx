@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/win-back.jsx
  * "Bring them back" -- an inactivity reminder with a business-type-aware
  * starting point. Owner sets a threshold + message body (or keeps the
@@ -39,6 +39,16 @@ function WinBackPage() {
   const [error,    setError]    = useState('');
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
+
+  useEffect(function() {
+    try {
+      if (localStorage.getItem('rb_deep_dive_seen_win-back') !== '1') {
+        setTimeout(function() {
+          if (window.__rbStartDeepDive) window.__rbStartDeepDive('win-back');
+        }, 50);
+      }
+    } catch (e) {}
+  }, []);
 
   const [enabled,       setEnabled]       = useState(false);
   const [inactiveDays,  setInactiveDays]  = useState(30);
@@ -144,7 +154,7 @@ function WinBackPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+      <div id="tour-winback-settings" className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-semibold text-gray-900">Enable win-back reminders</p>
@@ -240,7 +250,7 @@ function WinBackPage() {
         </button>
       </div>
 
-      <div className="flex items-center justify-between mb-3">
+      <div id="tour-winback-due" className="flex items-center justify-between mb-3">
         <h2 className="text-base font-bold text-gray-900">Customers Due</h2>
         {!loading && <span className="text-xs text-gray-400">{due.length} customer{due.length === 1 ? '' : 's'}</span>}
       </div>
