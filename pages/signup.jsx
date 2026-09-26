@@ -1,4 +1,4 @@
-﻿/**
+﻿﻿/**
  * pages/signup.jsx
  * Signup -- Welcome + Account Details only. Creates the account and logs
  * the owner in immediately (no approval wait), then hands off to
@@ -82,34 +82,28 @@ export default function SignupPage() {
   if (isLoading || isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-sidebar flex items-start sm:items-center justify-center p-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4 py-8">
       <SEO title="Sign Up" description="Create your free ReviewBooster account and start collecting Google reviews today." path="/signup" />
-
-      {/* Background pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-brand-500/5 rounded-full blur-3xl" />
-      </div>
 
       <div className="relative w-full max-w-sm">
 
         {step === 1 ? (
           <>
             {/* Welcome screen */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
               <div className="inline-flex items-center gap-2 mb-3">
-                <span className="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center text-xl shrink-0">{'\u2B50'}</span>
-                <span className="text-white font-bold text-2xl tracking-tight text-left">
-                  Review<span className="text-brand-500">Booster</span>
-                  <span className="block text-white/30 text-[11px] font-normal tracking-normal">More Reviews. More Customers.</span>
+                <span className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-xl shrink-0">{'\u2B50'}</span>
+                <span className="text-gray-900 font-bold text-2xl tracking-tight text-left">
+                  Review<span className="text-purple-600">Booster</span>
+                  <span className="block text-gray-400 text-[11px] font-normal tracking-normal">More Reviews. More Customers.</span>
                 </span>
               </div>
 
               {referrerInfo && (
-                <div className="my-5 p-3.5 rounded-lg bg-brand-500/10 border border-brand-500/20 text-sm flex items-start gap-2 text-left">
+                <div className="my-5 p-3.5 rounded-lg bg-purple-50 border border-purple-100 text-sm flex items-start gap-2 text-left">
                   <span className="mt-0.5 shrink-0">{'\uD83C\uDF81'}</span>
-                  <span className="text-white/80">
-                    {'Referred by '}<span className="font-semibold text-white">{referrerInfo.referrer_name}</span>
+                  <span className="text-gray-600">
+                    {'Referred by '}<span className="font-semibold text-gray-900">{referrerInfo.referrer_name}</span>
                     {referrerInfo.referred_discount_pct > 0
                       ? ' \u2014 you\u2019ll get ' + referrerInfo.referred_discount_pct + '% off your first plan.'
                       : '.'}
@@ -117,23 +111,23 @@ export default function SignupPage() {
                 </div>
               )}
 
-              <h1 className="text-white text-xl font-bold mt-5 mb-2">Get more reviews.<br />Grow your business.</h1>
-              <p className="text-white/40 text-sm leading-relaxed mb-6">
+              <h1 className="text-gray-900 text-xl font-bold mt-5 mb-2">Get more reviews.<br />Grow your business.</h1>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 {'ReviewBooster helps you collect real customer feedback, boost your Google ratings, and turn happy customers into loyal fans.'}
               </p>
 
               <button
                 type="button"
                 onClick={function() { setStep(2); }}
-                className="w-full py-3 rounded-xl bg-brand-500 text-white font-bold text-sm hover:bg-brand-600 active:scale-[0.98] transition-all duration-150"
+                className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 active:scale-[0.98] transition-all duration-150"
               >
                 Get Started
               </button>
             </div>
 
-            <p className="text-center text-white/25 text-xs mt-6">
+            <p className="text-center text-gray-400 text-xs mt-6">
               Already have an account?{' '}
-              <a href="/login" className="text-brand-500/70 hover:text-brand-500 transition-colors duration-150">Sign in</a>
+              <a href="/login" className="text-purple-600 hover:text-purple-700 font-semibold transition-colors duration-150">Sign in</a>
             </p>
           </>
         ) : (
@@ -142,24 +136,24 @@ export default function SignupPage() {
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 mb-3">
                 <span className="text-3xl">{'\u2B50'}</span>
-                <span className="text-white font-bold text-2xl tracking-tight">
-                  Review<span className="text-brand-500">Booster</span>
+                <span className="text-gray-900 font-bold text-2xl tracking-tight">
+                  Review<span className="text-purple-600">Booster</span>
                 </span>
               </div>
-              <p className="text-white/40 text-sm">Create your account</p>
+              <p className="text-gray-400 text-sm">Create your account</p>
             </div>
 
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
               <button
                 type="button"
                 onClick={function() { setStep(1); }}
-                className="text-white/30 hover:text-white/60 text-sm mb-4 -ml-1 transition-colors"
+                className="text-gray-400 hover:text-gray-600 text-sm mb-4 -ml-1 transition-colors"
               >
                 {'\u2190'}
               </button>
 
               {error && (
-                <div className="mb-5 p-3.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
+                <div className="mb-5 p-3.5 rounded-lg bg-red-50 border border-red-100 text-red-600 text-sm flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">{'\u26A0'}</span>
                   <span>{error}</span>
                 </div>
@@ -167,19 +161,19 @@ export default function SignupPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-1.5">Your Name</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your Name</label>
                   <input
                     type="text"
                     required
                     value={ownerName}
                     onChange={(e) => setOwnerName(e.target.value)}
                     placeholder="Rahul Sharma"
-                    className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 transition-colors duration-150"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-1.5">Email Address</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
                   <input
                     type="email"
                     required
@@ -187,12 +181,12 @@ export default function SignupPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@gmail.com"
-                    className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 transition-colors duration-150"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-1.5">Password</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -201,13 +195,13 @@ export default function SignupPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Min. 8 characters"
-                      className="w-full px-4 py-3 pr-11 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
+                      className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 transition-colors duration-150"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(function(v) { return !v; })}
                       aria-label="Toggle password visibility"
-                      className="absolute inset-y-0 right-0 flex items-center px-3.5 text-white/30 hover:text-white/70 transition-colors duration-150">
+                      className="absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-400 hover:text-gray-600 transition-colors duration-150">
                       {showPassword ? (
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
@@ -223,7 +217,7 @@ export default function SignupPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-1.5">Confirm Password</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Confirm Password</label>
                   <div className="relative">
                     <input
                       type={showConfirmPw ? 'text' : 'password'}
@@ -232,13 +226,13 @@ export default function SignupPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Repeat your password"
-                      className="w-full px-4 py-3 pr-11 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500/50 transition-colors duration-150"
+                      className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-300 transition-colors duration-150"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPw(function(v) { return !v; })}
                       aria-label="Toggle confirm password visibility"
-                      className="absolute inset-y-0 right-0 flex items-center px-3.5 text-white/30 hover:text-white/70 transition-colors duration-150">
+                      className="absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-400 hover:text-gray-600 transition-colors duration-150">
                       {showConfirmPw ? (
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
@@ -256,7 +250,7 @@ export default function SignupPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 rounded-xl bg-brand-500 text-white font-bold text-sm hover:bg-brand-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2">
+                  className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2">
                   {loading ? (
                     <>
                       <span className="spinner w-4 h-4" />
@@ -270,8 +264,8 @@ export default function SignupPage() {
         )}
 
         <p className="text-center mt-6">
-          <span className="text-white/20 text-xs">Powered by </span>
-          <span className="text-white/35 text-xs font-semibold">Adcend</span>
+          <span className="text-gray-300 text-xs">Powered by </span>
+          <span className="text-gray-500 text-xs font-semibold">Adcend</span>
         </p>
 
       </div>
