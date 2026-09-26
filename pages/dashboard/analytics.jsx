@@ -96,13 +96,9 @@ function DashboardPage() {
   const firstLoadRef = useRef(true);
 
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_analytics') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('analytics');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('analytics');
+    }, 50);
   }, []);
 
   useEffect(() => { setMounted(true); }, []);

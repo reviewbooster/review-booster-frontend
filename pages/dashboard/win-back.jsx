@@ -41,13 +41,9 @@ function WinBackPage() {
   const [saved,    setSaved]    = useState(false);
 
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_win-back') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('win-back');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('win-back');
+    }, 50);
   }, []);
 
   const [enabled,       setEnabled]       = useState(false);

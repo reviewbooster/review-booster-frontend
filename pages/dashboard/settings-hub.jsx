@@ -35,13 +35,9 @@ function SettingsHubPage() {
   const isStaff = user?.role === 'staff';
 
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_settings') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('settings');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('settings');
+    }, 50);
   }, []);
 
   return (

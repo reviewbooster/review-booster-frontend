@@ -672,13 +672,9 @@ function FeedbackPage() {
   const { user } = useAuth();
   useEffect(function() { localStorage.setItem('rb_visited_feedback', '1'); }, []);
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_feedback') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('feedback');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('feedback');
+    }, 50);
   }, []);
   const isStaff = user?.role === 'staff';
   const [activeTab,   setActiveTab]   = useState('new');
