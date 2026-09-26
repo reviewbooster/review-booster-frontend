@@ -468,6 +468,8 @@ function CustomerDetailPage() {
   var [deleteOpen, setDeleteOpen] = useState(false);
   var [followUpOpen, setFollowUpOpen] = useState(false);
   var [followUp,     setFollowUp]     = useState(null);
+  var [timelineExpanded, setTimelineExpanded] = useState(false);
+
   var [followUpLoaded, setFollowUpLoaded] = useState(false);
   var [menuOpen, setMenuOpen]   = useState(false);
   var [toast,    setToast]      = useState('');
@@ -820,10 +822,11 @@ function CustomerDetailPage() {
           <h2 className="text-sm font-bold text-gray-900">Activity timeline</h2>
         </div>
         <div className="px-5 py-4">
-          {timeline.map(function (item, i) {
+          {(timelineExpanded ? timeline : timeline.slice(0, 5)).map(function (item, i) {
+            var visibleCount = timelineExpanded ? timeline.length : Math.min(5, timeline.length);
             return (
               <div key={i} className="flex gap-3 pb-4 last:pb-0 relative">
-                {i < timeline.length - 1 && (
+                {i < visibleCount - 1 && (
                   <span className="absolute left-[5px] top-4 bottom-0 w-px bg-gray-100" />
                 )}
                 <span className={'w-3 h-3 rounded-full shrink-0 mt-1 z-10 ' + TIMELINE_DOT[item.kind]} />
@@ -837,6 +840,15 @@ function CustomerDetailPage() {
               </div>
             );
           })}
+          {timeline.length > 5 && (
+            <button
+              type="button"
+              onClick={function () { setTimelineExpanded(!timelineExpanded); }}
+              className="w-full text-center text-xs font-semibold text-purple-600 hover:text-purple-700 pt-1"
+            >
+              {timelineExpanded ? 'Show less' : 'See more (' + (timeline.length - 5) + ')'}
+            </button>
+          )}
         </div>
       </div>
 

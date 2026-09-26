@@ -42,7 +42,12 @@ function GrowthHubPage() {
           <p className="text-[13px] text-gray-400 mt-0.5">Referrals, win-back campaigns, and your numbers.</p>
         </div>
         <InfoButton title="Growth" autoShowKey="growth">
-          Understand review growth, campaign performance, and what{'\u2019'}s actually working. Referrals tracks customers who refer new business your way, Win-Back helps you re-engage customers who haven{'\u2019'}t been back in a while, and Analytics breaks down your review funnel and trends over time.
+          <p className="font-medium text-gray-700">Review growth, campaign performance, and what's actually working.</p>
+          <ul className="mt-3 space-y-2 list-disc list-inside">
+            <li><span className="font-semibold text-gray-700">Referrals</span> {'\u2014'} customers who refer new business your way</li>
+            <li><span className="font-semibold text-gray-700">Win-Back</span> {'\u2014'} re-engage customers who haven't been back in a while</li>
+            <li><span className="font-semibold text-gray-700">Analytics</span> {'\u2014'} your review funnel and trends over time</li>
+          </ul>
         </InfoButton>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -164,6 +164,7 @@ export default function SpotlightTour() {
   const [rect,     setRect]     = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const retryRef = useRef(0);
+  const [activeDiveKey, setActiveDiveKey] = useState(null); // which DEEP_DIVES key (if any) is the current run
 
   var currentStep = stepList[stepIdx] || null;
 
@@ -183,18 +184,29 @@ export default function SpotlightTour() {
       retryRef.current = 0;
       setRect(el.getBoundingClientRect());
       el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-    } else if (retryRef.current < 8) {
+      // Only now -- once a target has actually been found and is genuinely
+      // about to be shown -- record that this deep dive has been seen. If
+      // every step's target search fails (e.g. the page's own data hasn't
+      // finished loading yet on a slow connection or a cold backend), this
+      // never fires, so the dive gets a real chance again on a future visit
+      // instead of being silently marked "seen" for something never shown.
+      if (activeDiveKey) {
+        try {
+          localStorage.setItem('rb_deep_dive_seen_' + activeDiveKey, '1');
+        } catch (e) {}
+      }
+    } else if (retryRef.current < 15) {
       // Element may not have mounted yet (async data, route just changed) --
-      // retry briefly rather than getting stuck with no spotlight.
+      // retry for a few seconds rather than getting stuck with no spotlight.
       retryRef.current += 1;
-      setTimeout(measure, 200);
+      setTimeout(measure, 250);
     } else {
       // Genuinely not on the page right now -- skip this step rather than
       // showing a spotlight with nothing to point at.
       goNext();
     }
     // eslint-disable-next-line
-  }, [currentStep]);
+  }, [currentStep, activeDiveKey]);
 
   useEffect(function() {
     retryRef.current = 0;
@@ -208,19 +220,10 @@ export default function SpotlightTour() {
     // eslint-disable-next-line
   }, [currentStep, router.pathname]);
 
-  function persistStep(idx) {
-    try { localStorage.setItem('rb_tour_step', String(idx)); } catch (e) {}
-  }
-
   function endTour(status) {
     setActive(false);
     setStepList([]);
-    try {
-      localStorage.removeItem('rb_tour_active');
-      localStorage.removeItem('rb_tour_step');
-      localStorage.removeItem('rb_tour_kind');
-      localStorage.removeItem('rb_tour_dive');
-    } catch (e) {}
+    setActiveDiveKey(null);
     if (status === 'completed') {
       api.patch('/business/my-settings', { product_tour_completed: true }).catch(function() {});
     } else if (status === 'skipped') {
@@ -235,7 +238,6 @@ export default function SpotlightTour() {
         endTour('completed');
         return prev;
       }
-      persistStep(next);
       return next;
     });
   }
@@ -244,25 +246,28 @@ export default function SpotlightTour() {
     endTour('skipped');
   }
 
-  // Start (or resume) a hub-level tour run.
+  // Start a hub-level tour run. Plain React state only -- no localStorage
+  // persistence, since no step in this tour ever navigates to a different
+  // page, so there is nothing that needs to survive a reload. That also
+  // means an interrupted tour (tab closed mid-tour) simply doesn't resume
+  // next time, rather than restarting forever on every future app open.
   function startHubTour() {
     if (active) return;
     setStepList(HUB_STEPS);
     setStepIdx(0);
     setActive(true);
-    try {
-      localStorage.setItem('rb_tour_active', '1');
-      localStorage.setItem('rb_tour_kind', 'hub');
-      localStorage.setItem('rb_tour_step', '0');
-    } catch (e) {}
+    setActiveDiveKey(null);
   }
 
   // Start a deep-dive run for a specific feature key -- called by each
-  // page's own first-visit trigger. Deliberately a no-op (and does NOT mark
-  // the dive as seen) if a tour is already running, e.g. the hub tour is
-  // mid-flight and happens to be sitting on this same page -- it'll get a
-  // fair chance to auto-trigger again on a later, uncontested visit instead
-  // of silently never showing at all.
+  // page's own first-visit trigger. Deliberately a no-op if a tour is
+  // already running, e.g. the hub tour is mid-flight and happens to be
+  // sitting on this same page -- it'll get a fair chance to auto-trigger
+  // again on a later, uncontested visit instead of silently never showing
+  // at all. rb_deep_dive_seen_<key> is written by measure() the moment a
+  // real target is actually found and about to be shown -- not here at
+  // start -- so a run whose target never loads in time doesn't get
+  // permanently marked "seen" for something the user never saw.
   function startDeepDive(key) {
     if (active) return;
     var dive = DEEP_DIVES[key];
@@ -270,13 +275,7 @@ export default function SpotlightTour() {
     setStepList(dive.steps);
     setStepIdx(0);
     setActive(true);
-    try {
-      localStorage.setItem('rb_tour_active', '1');
-      localStorage.setItem('rb_tour_kind', 'deep');
-      localStorage.setItem('rb_tour_dive', key);
-      localStorage.setItem('rb_tour_step', '0');
-      localStorage.setItem('rb_deep_dive_seen_' + key, '1');
-    } catch (e) {}
+    setActiveDiveKey(key);
   }
 
   // Expose start functions globally so the "Show me around" button and
@@ -291,30 +290,6 @@ export default function SpotlightTour() {
     };
     // eslint-disable-next-line
   }, [stepList]);
-
-  // Resume an in-progress tour on mount / route change (e.g. after a hub
-  // step's Next navigated to a new page for a queued deep dive).
-  useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_tour_active') !== '1') return;
-      var kind = localStorage.getItem('rb_tour_kind');
-      var idx  = parseInt(localStorage.getItem('rb_tour_step') || '0', 10);
-      if (kind === 'hub') {
-        setStepList(HUB_STEPS);
-        setStepIdx(isNaN(idx) ? 0 : idx);
-        setActive(true);
-      } else if (kind === 'deep') {
-        var diveKey = localStorage.getItem('rb_tour_dive');
-        var dive = DEEP_DIVES[diveKey];
-        if (dive) {
-          setStepList(dive.steps);
-          setStepIdx(isNaN(idx) ? 0 : idx);
-          setActive(true);
-        }
-      }
-    } catch (e) {}
-    // eslint-disable-next-line
-  }, []);
 
   // Esc to skip.
   useEffect(function() {
@@ -340,7 +315,7 @@ export default function SpotlightTour() {
   var tooltipStyle = {};
   var vw = window.innerWidth, vh = window.innerHeight;
   var TW = Math.min(320, vw - 24);
-  var TH_ESTIMATE = 130;
+  var TH_ESTIMATE = 130 + (currentStep.points ? currentStep.points.length * 18 : 0);
   // A fixed estimate rather than trying to read env(safe-area-inset-bottom)
   // via JS (which has no reliable cross-browser read path without injecting
   // a probe element) -- generous enough to clear the home indicator on

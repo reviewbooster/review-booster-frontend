@@ -54,7 +54,12 @@ function ReviewsHubPage() {
           <p className="text-[13px] text-gray-400 mt-0.5">Everything about collecting and managing reviews.</p>
         </div>
         <InfoButton title="Reviews" autoShowKey="reviews">
-          This is where you collect customer feedback and guide happy customers toward leaving a public Google review. Your QR code is how customers get here, Google Reviews shows what they've posted publicly, and Feedback is for the private complaints that need your attention first.
+          <p className="font-medium text-gray-700">Where you collect feedback and guide happy customers toward a public Google review.</p>
+          <ul className="mt-3 space-y-2 list-disc list-inside">
+            <li><span className="font-semibold text-gray-700">QR code</span> {'\u2014'} how customers get here</li>
+            <li><span className="font-semibold text-gray-700">Google Reviews</span> {'\u2014'} what they've posted publicly</li>
+            <li><span className="font-semibold text-gray-700">Feedback</span> {'\u2014'} private complaints that need your attention first</li>
+          </ul>
         </InfoButton>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

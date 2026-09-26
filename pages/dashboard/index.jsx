@@ -549,8 +549,8 @@ function DashboardPage() {
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
 
         {/* Hero rating card + grouped stats card, side by side once there's room */}
-        <div data-tour="dashboard-stats" className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-5">
-          <AvgCard summary={summary} mtd={mtd} />
+        <div data-tour="dashboard-stats" className="grid grid-cols-2 gap-3 mb-5">
+          <AvgCard summary={summary} mtd={mtd} mobile />
           <StatsGroupCard items={miniCards} />
         </div>
 
@@ -586,8 +586,8 @@ function DashboardPage() {
 
         {/* Quick Actions -- one card, a few compact rows, not a card each */}
         <p className="text-sm font-bold text-gray-800 mt-5 mb-2">Quick Actions</p>
-        <div id="tour-quick-actions" className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-          <Link href="/dashboard/follow-ups" className={'flex items-center gap-3 px-4 py-3 transition-colors ' + (followUpCount > 0 ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/60')}>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+          <Link id="tour-quick-actions" href="/dashboard/follow-ups" className={'flex items-center gap-3 px-4 py-3 transition-colors ' + (followUpCount > 0 ? 'bg-red-50/60 hover:bg-red-50' : 'hover:bg-gray-50/60')}>
             <div className={'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ' + (followUpCount > 0 ? 'bg-red-100' : 'bg-gray-100')}>
               <svg width="16" height="16" fill="none" stroke={followUpCount > 0 ? '#DC2626' : '#9CA3AF'} strokeWidth="1.8" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

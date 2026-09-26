@@ -1021,7 +1021,13 @@ function CustomersPage() {
           <div className="flex items-center gap-2 shrink-0">
             <h1 className="text-xl font-bold text-gray-900">Customers</h1>
             <InfoButton title="Customers">
-              Keep customer activity, feedback, and follow-ups organized in one place. Every customer who scans your QR code or gets added manually shows up here, along with their review history, any private feedback they've left, and whether they need a follow-up.
+              <p className="font-medium text-gray-700">Every customer's activity, feedback, and follow-ups in one place.</p>
+              <ul className="mt-3 space-y-2 list-disc list-inside">
+                <li>Added when they scan your QR code, or manually</li>
+                <li>Full review history for each customer</li>
+                <li>Any private feedback they've left</li>
+                <li>Whether they're due for a follow-up</li>
+              </ul>
             </InfoButton>
           </div>
           <div className="flex items-center gap-2 shrink-0">
