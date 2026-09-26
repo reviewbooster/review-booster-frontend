@@ -489,6 +489,17 @@ function CustomerDetailPage() {
     }
   };
 
+  // A plain, untracked conversation -- no review-request link, no
+  // prefilled text, no /requests API call. Deliberately separate from
+  // Send Request below: this is just reaching out, not asking for a review.
+  var handleMessage = function () {
+    if (customer.phone) {
+      window.open('https://wa.me/' + customer.phone.replace(/^\+/, ''), '_blank');
+    } else if (customer.email) {
+      window.location.href = 'mailto:' + customer.email;
+    }
+  };
+
   var fetchAll = async function (opts) {
     var silent = opts && opts.silent;
     if (!id) return;
@@ -690,8 +701,8 @@ function CustomerDetailPage() {
         {/* Quick actions */}
         <div id="tour-customer-actions" className="grid grid-cols-3 gap-2 w-full mt-5">
           <button
-            onClick={() => setSendOpen(true)}
-            disabled={customer.opted_out}
+            onClick={handleMessage}
+            disabled={customer.opted_out || (!customer.phone && !customer.email)}
             className="flex flex-col items-center gap-1 py-3 rounded-xl border border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
