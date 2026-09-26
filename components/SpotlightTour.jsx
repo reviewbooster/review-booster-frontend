@@ -355,15 +355,21 @@ export default function SpotlightTour() {
     if (spaceBelow >= TH_ESTIMATE + 16) {
       tooltipStyle = { top: rect.bottom + 14, left: left, width: TW };
     } else if (spaceAbove >= TH_ESTIMATE + 16) {
-      tooltipStyle = { top: rect.top - TH_ESTIMATE - 14, left: left, width: TW };
+      // Anchored from the bottom, not computed via top = rect.top - height:
+      // the gap above the target stays exactly 16px no matter how tall the
+      // card actually renders (bullet count, text wrap, etc.), instead of
+      // depending on TH_ESTIMATE guessing that height correctly.
+      tooltipStyle = { bottom: vh - rect.top + 16, left: left, width: TW };
     } else if (!isMobile && vw - rect.right >= TW + 24) {
       tooltipStyle = { top: Math.min(Math.max(rect.top, 12), vh - TH_ESTIMATE - 12), left: rect.right + 14, width: TW };
     } else if (!isMobile && rect.left >= TW + 24) {
       tooltipStyle = { top: Math.min(Math.max(rect.top, 12), vh - TH_ESTIMATE - 12), left: Math.max(rect.left - TW - 14, 12), width: TW };
     } else {
-      // Nothing fits cleanly (rare) -- anchor just above the bottom
-      // reserve, never covering the app's own bottom nav.
-      tooltipStyle = { top: vh - bottomReserve - TH_ESTIMATE - 14, left: Math.min(Math.max(12, (vw - TW) / 2), vw - TW - 12), width: TW };
+      // Nothing fits cleanly (rare) -- anchor from the bottom reserve
+      // instead of top = vh - bottomReserve - height, for the same
+      // height-independence: never covers the app's own bottom nav
+      // regardless of the card's real rendered height.
+      tooltipStyle = { bottom: bottomReserve + 16, left: Math.min(Math.max(12, (vw - TW) / 2), vw - TW - 12), width: TW };
     }
   }
 
