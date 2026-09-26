@@ -234,6 +234,59 @@ function DeleteConfirmModal({ customer, onClose, onDeleted }) {
 }
 
 // -- Send Request Modal -------------------------------------------------------
+// -- Message modal: plain, untracked contact. Pick a channel, it opens
+// immediately -- no prefilled text, no "ready" confirmation step, no
+// backend call. Deliberately separate from Send Request below.
+function MessageChannelModal({ customer, onClose }) {
+  var CHANNELS = [
+    { id: 'whatsapp', label: 'WhatsApp', color: 'bg-green-500 hover:bg-green-600',   needs: 'phone' },
+    { id: 'sms',      label: 'SMS',      color: 'bg-blue-500 hover:bg-blue-600',     needs: 'phone' },
+    { id: 'email',    label: 'Email',    color: 'bg-purple-500 hover:bg-purple-600', needs: 'email' },
+  ];
+
+  var openChannel = function (id) {
+    if (id === 'whatsapp') {
+      window.open('https://wa.me/' + customer.phone.replace(/^\+/, ''), '_blank');
+    } else if (id === 'sms') {
+      window.location.href = 'sms:' + customer.phone;
+    } else if (id === 'email') {
+      window.location.href = 'mailto:' + customer.email;
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-slide-up">
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">Message</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{customer.name}</p>
+          </div>
+          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">{'\u2715'}</button>
+        </div>
+        <div className="p-6 space-y-3">
+          <p className="text-sm text-gray-500">Choose how to reach out.</p>
+          {CHANNELS.map(function (ch) {
+            var noData = ch.needs === 'phone' ? !customer.phone : !customer.email;
+            return (
+              <button key={ch.id} onClick={() => openChannel(ch.id)}
+                disabled={noData}
+                className={'w-full flex items-center justify-between px-4 py-3 rounded-xl text-white text-sm font-semibold transition-colors duration-150 ' + ch.color + ' disabled:opacity-40 disabled:cursor-not-allowed'}>
+                <span>{ch.label}</span>
+                {noData
+                  ? <span className="text-xs font-normal opacity-70">{'No ' + ch.needs}</span>
+                  : <span className="opacity-60">{'\u2192'}</span>}
+              </button>
+            );
+          })}
+          <button onClick={onClose} className="btn-secondary w-full justify-center">Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SendRequestModal({ customer, onClose, onSent }) {
   var [loadingCh, setLoadingCh] = useState(null);
   var [error,     setError]     = useState('');
@@ -465,6 +518,7 @@ function CustomerDetailPage() {
   var [error,    setError]      = useState('');
   var [editOpen, setEditOpen]   = useState(false);
   var [sendOpen, setSendOpen]   = useState(false);
+  var [messageOpen, setMessageOpen] = useState(false);
   var [deleteOpen, setDeleteOpen] = useState(false);
   var [followUpOpen, setFollowUpOpen] = useState(false);
   var [followUp,     setFollowUp]     = useState(null);
@@ -486,17 +540,6 @@ function CustomerDetailPage() {
       showToast('Follow-up marked done!');
     } catch (err) {
       showToast(err.response?.data?.error || 'Failed to complete follow-up.');
-    }
-  };
-
-  // A plain, untracked conversation -- no review-request link, no
-  // prefilled text, no /requests API call. Deliberately separate from
-  // Send Request below: this is just reaching out, not asking for a review.
-  var handleMessage = function () {
-    if (customer.phone) {
-      window.open('https://wa.me/' + customer.phone.replace(/^\+/, ''), '_blank');
-    } else if (customer.email) {
-      window.location.href = 'mailto:' + customer.email;
     }
   };
 
@@ -633,6 +676,11 @@ function CustomerDetailPage() {
           onClose={() => setSendOpen(false)}
           onSent={() => { fetchAll({ silent: true }); showToast('Review link ready!'); }} />
       )}
+      {messageOpen && (
+        <MessageChannelModal
+          customer={customer}
+          onClose={() => setMessageOpen(false)} />
+      )}
       {deleteOpen && (
         <DeleteConfirmModal
           customer={customer}
@@ -701,8 +749,8 @@ function CustomerDetailPage() {
         {/* Quick actions */}
         <div id="tour-customer-actions" className="grid grid-cols-3 gap-2 w-full mt-5">
           <button
-            onClick={handleMessage}
-            disabled={customer.opted_out || (!customer.phone && !customer.email)}
+            onClick={() => setMessageOpen(true)}
+            disabled={customer.opted_out}
             className="flex flex-col items-center gap-1 py-3 rounded-xl border border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
