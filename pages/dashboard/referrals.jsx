@@ -587,13 +587,9 @@ function ReferralsPage() {
   const [businessType, setBusinessType] = useState(null);
 
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_referrals') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('referrals');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('referrals');
+    }, 50);
   }, []);
 
   useEffect(() => {

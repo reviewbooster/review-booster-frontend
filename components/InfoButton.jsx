@@ -1,21 +1,24 @@
 ﻿import { useState, useEffect } from 'react';
+import { useProductFeatures } from '../context/ProductFeaturesContext';
 
 export default function InfoButton({ title, children, autoShowKey }) {
   const [open, setOpen] = useState(false);
+  const { seenKeys, loaded, markSeen } = useProductFeatures();
 
   // Progressive disclosure: on a feature's first-ever visit, show this
   // explanation automatically once, then never again -- the button stays
-  // available for anyone who wants to reopen it later.
+  // available for anyone who wants to reopen it later. Tracked on the
+  // business itself (not localStorage), so it stays seen for this account
+  // no matter which device or browser opens the page.
   useEffect(function() {
-    if (!autoShowKey) return;
-    try {
-      var seenKey = 'rb_feature_seen_' + autoShowKey;
-      if (localStorage.getItem(seenKey) !== '1') {
-        setOpen(true);
-        localStorage.setItem(seenKey, '1');
-      }
-    } catch (e) {}
-  }, [autoShowKey]);
+    if (!autoShowKey || !loaded) return;
+    var seenKey = 'info_' + autoShowKey;
+    if (seenKeys.indexOf(seenKey) === -1) {
+      setOpen(true);
+      markSeen(seenKey);
+    }
+    // eslint-disable-next-line
+  }, [autoShowKey, loaded]);
 
   return (
     <>

@@ -762,13 +762,9 @@ function CustomersPage() {
   const { user } = useAuth();
   useEffect(function() { localStorage.setItem('rb_visited_customers', '1'); }, []);
   useEffect(function() {
-    try {
-      if (localStorage.getItem('rb_deep_dive_seen_customers') !== '1') {
-        setTimeout(function() {
-          if (window.__rbStartDeepDive) window.__rbStartDeepDive('customers');
-        }, 50);
-      }
-    } catch (e) {}
+    setTimeout(function() {
+      if (window.__rbStartDeepDive) window.__rbStartDeepDive('customers');
+    }, 50);
   }, []);
   const isStaff = user?.role === 'staff';
 

@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
+import { useProductFeatures } from '../context/ProductFeaturesContext';
 
 // -- Level 1: Hub tour ------------------------------------------------------
 // Spotlights the actual sidebar/nav item for each section, from wherever the
@@ -165,6 +166,8 @@ export default function SpotlightTour() {
   const [isMobile, setIsMobile] = useState(false);
   const retryRef = useRef(0);
   const [activeDiveKey, setActiveDiveKey] = useState(null); // which DEEP_DIVES key (if any) is the current run
+  const { seenKeys, loaded: featuresLoaded, markSeen } = useProductFeatures();
+  const pendingDiveKeyRef = useRef(null); // a dive requested before the seen-list had finished loading
 
   var currentStep = stepList[stepIdx] || null;
 
@@ -190,10 +193,10 @@ export default function SpotlightTour() {
       // finished loading yet on a slow connection or a cold backend), this
       // never fires, so the dive gets a real chance again on a future visit
       // instead of being silently marked "seen" for something never shown.
+      // Recorded on the business itself (via markSeen), not the browser --
+      // so it stays seen for this account no matter which device opens it.
       if (activeDiveKey) {
-        try {
-          localStorage.setItem('rb_deep_dive_seen_' + activeDiveKey, '1');
-        } catch (e) {}
+        markSeen('dive_' + activeDiveKey);
       }
     } else if (retryRef.current < 15) {
       // Element may not have mounted yet (async data, route just changed) --
@@ -206,7 +209,7 @@ export default function SpotlightTour() {
       goNext();
     }
     // eslint-disable-next-line
-  }, [currentStep, activeDiveKey]);
+  }, [currentStep, activeDiveKey, markSeen]);
 
   useEffect(function() {
     retryRef.current = 0;
@@ -270,6 +273,15 @@ export default function SpotlightTour() {
   // permanently marked "seen" for something the user never saw.
   function startDeepDive(key) {
     if (active) return;
+    if (!featuresLoaded) {
+      // Don't know yet whether this business has already seen it -- remember
+      // the request and act on it once the seen-list finishes loading,
+      // rather than risk flashing something already-seen while that check
+      // is still in flight.
+      pendingDiveKeyRef.current = key;
+      return;
+    }
+    if (seenKeys.indexOf('dive_' + key) !== -1) return;
     var dive = DEEP_DIVES[key];
     if (!dive) return;
     setStepList(dive.steps);
@@ -277,6 +289,17 @@ export default function SpotlightTour() {
     setActive(true);
     setActiveDiveKey(key);
   }
+
+  // A dive requested while the seen-list was still loading gets a second
+  // shot the moment that finishes, instead of being silently dropped.
+  useEffect(function() {
+    if (featuresLoaded && pendingDiveKeyRef.current) {
+      var key = pendingDiveKeyRef.current;
+      pendingDiveKeyRef.current = null;
+      startDeepDive(key);
+    }
+    // eslint-disable-next-line
+  }, [featuresLoaded]);
 
   // Expose start functions globally so the "Show me around" button and
   // per-page deep-dive triggers can reach this single mounted instance
@@ -289,7 +312,7 @@ export default function SpotlightTour() {
       delete window.__rbStartDeepDive;
     };
     // eslint-disable-next-line
-  }, [stepList]);
+  }, [stepList, featuresLoaded, seenKeys]);
 
   // Esc to skip.
   useEffect(function() {
