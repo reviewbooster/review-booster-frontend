@@ -332,7 +332,9 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
-                autoComplete="email"
+                name="username"
+                id="login-email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@gmail.com"
@@ -348,6 +350,8 @@ className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-wh
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  name="current-password"
+                  id="login-password"
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
