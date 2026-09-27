@@ -328,6 +328,7 @@ function DashboardPage() {
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24)))
     : null;
+  const trialExpired = trialEndsAt ? (new Date(trialEndsAt).getTime() < Date.now()) : false;
 
   const miniCards = [
     {
@@ -538,8 +539,10 @@ function DashboardPage() {
           )}
         </div>
         {businessPlan === 'trial' && trialDaysLeft !== null && (
-          <p className="text-[11px] text-purple-600 font-medium mt-2.5">
-            {'Trial ends in ' + trialDaysLeft + ' day' + (trialDaysLeft === 1 ? '' : 's') + ' \u00b7 '}
+          <p className={'text-[11px] font-medium mt-2.5 ' + (trialExpired ? 'text-red-600' : 'text-purple-600')}>
+            {trialExpired
+              ? 'Your trial has expired \u00b7 '
+              : ('Trial ends in ' + trialDaysLeft + ' day' + (trialDaysLeft === 1 ? '' : 's') + ' \u00b7 ')}
             <Link href="/dashboard/settings/billing" className="underline hover:text-purple-700">Upgrade plan</Link>
           </p>
         )}
