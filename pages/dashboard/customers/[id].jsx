@@ -10,7 +10,7 @@ import { useRouter } from 'next/router';
 import DashboardLayout from '../../../components/DashboardLayout';
 import withAuth from '../../../components/withAuth';
 import api from '../../../lib/api';
-import { waLinkProps } from '../../../lib/waLink';
+import { waLinkProps, isStandalonePWA } from '../../../lib/waLink';
 import { getNotesLabel } from '../../../lib/industryFieldLabels';
 
 const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#0EA5E9'];
@@ -246,7 +246,12 @@ function MessageChannelModal({ customer, onClose }) {
 
   var openChannel = function (id) {
     if (id === 'whatsapp') {
-      window.open('https://wa.me/' + customer.phone.replace(/^\+/, ''), '_blank');
+      var waUrl = 'https://wa.me/' + customer.phone.replace(/^\+/, '');
+      if (isStandalonePWA()) {
+        window.location.href = waUrl;
+      } else {
+        window.open(waUrl, '_blank');
+      }
     } else if (id === 'sms') {
       window.location.href = 'sms:' + customer.phone;
     } else if (id === 'email') {

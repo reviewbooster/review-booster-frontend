@@ -10,6 +10,15 @@ import Head from 'next/head';
 import StarRating from '../../components/StarRating';
 import api from '../../lib/api';
 import { getExperienceChips, generateReviewDraft, getIssueGroups, findIssue } from '../../lib/reviewDraftPrompts';
+import { isStandalonePWA } from '../../lib/waLink';
+
+function openGoogleReview(url) {
+  if (isStandalonePWA()) {
+    window.location.href = url;
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
 
 const SCREEN = {
   LOADING:       'loading',
@@ -271,7 +280,7 @@ export default function PublicReviewPage() {
     // Still synchronous and immediate, so mobile browsers still treat this
     // as a direct response to the user's tap rather than a blocked popup.
     if (business.google_review_url) {
-      window.open(business.google_review_url, '_blank', 'noopener,noreferrer');
+      openGoogleReview(business.google_review_url);
     }
     var chipLabels = getExperienceChips(business.type)
       .filter(function (c) { return selectedChips.indexOf(c.key) !== -1; })
@@ -282,7 +291,7 @@ export default function PublicReviewPage() {
   var handleSkipToGoogle = function () {
     setUsedDraft(false);
     if (business.google_review_url) {
-      window.open(business.google_review_url, '_blank', 'noopener,noreferrer');
+      openGoogleReview(business.google_review_url);
     }
     var chipLabels = getExperienceChips(business.type)
       .filter(function (c) { return selectedChips.indexOf(c.key) !== -1; })
@@ -754,7 +763,7 @@ export default function PublicReviewPage() {
                   {business.google_review_url && (
                     <button
                       type="button"
-                      onClick={function () { window.open(business.google_review_url, '_blank', 'noopener,noreferrer'); }}
+                      onClick={function () { openGoogleReview(business.google_review_url); }}
                       className="text-xs font-semibold text-purple-600 hover:text-purple-700"
                     >
                       {usedDraft ? 'Didn\u2019t open? Tap to open Google Review' : 'Leave a Review on Google'}

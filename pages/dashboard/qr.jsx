@@ -6,6 +6,7 @@ import QRCode from 'react-qr-code';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import { isStandalonePWA } from '../../lib/waLink';
 
 // -- Business-type-aware placement guidance --------------------------------
 // Same generic + specific layering pattern used everywhere else in this app.
@@ -382,11 +383,20 @@ function QrPage() {
   function handleWhatsAppShare() {
     try { localStorage.setItem('rb_qr_shared', '1'); } catch (e) {}
     var text = shareMessage + '\n\n' + qrUrl;
-    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+    var waUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
+    if (isStandalonePWA()) {
+      window.location.href = waUrl;
+    } else {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
   }
 
   function handleTestQr() {
-    window.open(qrUrl, '_blank', 'noopener,noreferrer');
+    if (isStandalonePWA()) {
+      window.location.href = qrUrl;
+    } else {
+      window.open(qrUrl, '_blank', 'noopener,noreferrer');
+    }
   }
 
   function handlePlacementSelect(key) {
