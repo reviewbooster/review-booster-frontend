@@ -375,7 +375,8 @@ function ReviewsPage() {
       // sidesteps popup blocking entirely, which a new-window approach
       // does not reliably do on mobile browsers.
       window.location.href = waUrl;
-    } catch (_) {
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Could not open WhatsApp right now.');
     }
     setReferringId(null);
   };
