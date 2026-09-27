@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/admin/plans.jsx
  * Super Admin — edit plan pricing/marketing copy AND the actual feature
  * limits enforced per plan (customer cap, staff cap, AI Reply, Engine A
@@ -22,6 +22,9 @@ function PlanCard({ plan, onSaved }) {
     ai_reply: !!(plan.limits && plan.limits.ai_reply),
     engine_a: !!(plan.limits && plan.limits.engine_a),
     engine_b: !!(plan.limits && plan.limits.engine_b),
+    win_back: !!(plan.limits && plan.limits.win_back),
+    analytics: !!(plan.limits && plan.limits.analytics),
+    custom_templates: !!(plan.limits && plan.limits.custom_templates),
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -44,6 +47,9 @@ function PlanCard({ plan, onSaved }) {
           ai_reply:  form.ai_reply,
           engine_a:  form.engine_a,
           engine_b:  form.engine_b,
+          win_back:  form.win_back,
+          analytics: form.analytics,
+          custom_templates: form.custom_templates,
         },
       };
       var res = await api.patch('/admin/plans/' + plan.slug, payload);
@@ -120,6 +126,18 @@ function PlanCard({ plan, onSaved }) {
         <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
           <span className="text-sm text-gray-700">Refer a Business (Engine B)</span>
           <input type="checkbox" checked={form.engine_b} onChange={function(e) { set('engine_b', e.target.checked); }} />
+        </label>
+        <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
+          <span className="text-sm text-gray-700">Win-Back Campaigns</span>
+          <input type="checkbox" checked={form.win_back} onChange={function(e) { set('win_back', e.target.checked); }} />
+        </label>
+        <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
+          <span className="text-sm text-gray-700">Advanced Analytics</span>
+          <input type="checkbox" checked={form.analytics} onChange={function(e) { set('analytics', e.target.checked); }} />
+        </label>
+        <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
+          <span className="text-sm text-gray-700">Custom Message Templates</span>
+          <input type="checkbox" checked={form.custom_templates} onChange={function(e) { set('custom_templates', e.target.checked); }} />
         </label>
       </div>
 
