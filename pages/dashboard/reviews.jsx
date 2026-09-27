@@ -169,6 +169,11 @@ function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, ref
 
 var DEFAULT_THANK_REFER_TEMPLATE = 'Hi {{name}}, thank you so much for the {{rating}}-star rating!\n\nIf you know anyone who might enjoy our service, here\'s your personal referral link to share with them:\n\n\uD83C\uDF81 Refer {{referral_threshold}} friends and get {{referral_reward}}\nYour friend gets: {{referral_offer}}\n\n{{link}}';
 
+// Used when Customer Referrals (Engine A) isn't on this plan -- a plain
+// thank-you with no referral ask/link, so the button still does something
+// useful instead of being blocked outright.
+var PLAIN_THANK_YOU_TEMPLATE = 'Hi {{name}}, thank you so much for the {{rating}}-star rating! We really appreciate you taking the time to share your feedback.';
+
 function fillTemplate(template, vars) {
   var result = template;
   Object.keys(vars).forEach(function(k) {
@@ -356,18 +361,30 @@ function ReviewsPage() {
     if (!r.customer_id || !r.customer_id.phone || referringId) return;
     setReferringId(r._id);
     try {
-      var res = await api.get('/referrals/customer/' + r.customer_id._id);
-      var link = window.location.origin + '/ref/' + res.data.data.code + '?owner=1';
-      var settingsRes = await api.get('/referrals/settings').catch(function() { return null; });
-      var refSettings = settingsRes && settingsRes.data && settingsRes.data.data;
-      var msg = fillTemplate(thankReferTemplate || DEFAULT_THANK_REFER_TEMPLATE, {
-        name: r.customer_id.name,
-        rating: r.rating,
-        link: link,
-        referral_threshold: refSettings && refSettings.reward_threshold != null ? refSettings.reward_threshold : '3',
-        referral_reward:    (refSettings && refSettings.reward_text) || 'a reward',
-        referral_offer:     (refSettings && refSettings.offer_text)  || 'a special offer',
-      });
+      var msg;
+      try {
+        var res = await api.get('/referrals/customer/' + r.customer_id._id);
+        var link = window.location.origin + '/ref/' + res.data.data.code + '?owner=1';
+        var settingsRes = await api.get('/referrals/settings').catch(function() { return null; });
+        var refSettings = settingsRes && settingsRes.data && settingsRes.data.data;
+        msg = fillTemplate(thankReferTemplate || DEFAULT_THANK_REFER_TEMPLATE, {
+          name: r.customer_id.name,
+          rating: r.rating,
+          link: link,
+          referral_threshold: refSettings && refSettings.reward_threshold != null ? refSettings.reward_threshold : '3',
+          referral_reward:    (refSettings && refSettings.reward_text) || 'a reward',
+          referral_offer:     (refSettings && refSettings.offer_text)  || 'a special offer',
+        });
+      } catch (gateErr) {
+        // Engine A (Customer Referrals) isn't on this plan -- fall back to
+        // a plain thank-you with no referral ask/link, rather than
+        // blocking the message entirely.
+        if (gateErr.response && gateErr.response.status === 403) {
+          msg = fillTemplate(PLAIN_THANK_YOU_TEMPLATE, { name: r.customer_id.name, rating: r.rating });
+        } else {
+          throw gateErr;
+        }
+      }
       var waUrl = 'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg);
       // Navigating the current tab (not opening a new window) is what
       // reliably hands off to WhatsApp on mobile -- a wa.me URL doesn't
