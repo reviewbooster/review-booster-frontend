@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import ChangePasswordModal from "./ChangePasswordModal";
 import api from "../lib/api";
 import NotificationDropdown from "./NotificationDropdown";
+import { useProductFeatures } from "../context/ProductFeaturesContext";
 
 // Flat top-level nav -- each item is a hub/landing page. matchPrefixes lists
 // every child route that should still show this item as "active" once you've
@@ -253,9 +254,54 @@ const TOP_NAV_ICONS = {
   "/dashboard/settings-hub":  SettingsGearIcon,
 };
 
+// Works out what to show for the plan: the tier actually in force right now
+// (Growth during a trial, Free once it ends or a paid plan lapses).
+function describePlan(planInfo) {
+  if (!planInfo || !planInfo.effective_plan) return null;
+  var names = { free: "Free", starter: "Starter", growth: "Growth", pro: "Pro", basic: "Basic", agency: "Agency", trial: "Free", expired: "Free" };
+  var name = names[planInfo.effective_plan] || planInfo.effective_plan;
+  var trialLeft = null;
+  if (planInfo.trial_ends_at) {
+    var ms = new Date(planInfo.trial_ends_at).getTime() - Date.now();
+    if (ms > 0) trialLeft = Math.ceil(ms / 86400000);
+  }
+  var onTrial = trialLeft !== null && (planInfo.plan === "free" || planInfo.plan === "trial");
+  return { name: name, onTrial: onTrial, trialLeft: trialLeft, plan: planInfo.effective_plan };
+}
+
+// Small tag that sits next to the logo. Tapping it opens Billing.
+function PlanTag({ planInfo }) {
+  var d = describePlan(planInfo);
+  if (!d) return null;
+  var label = d.onTrial ? "Trial \u00b7 " + d.trialLeft + "d" : d.name;
+  var cls = d.onTrial
+    ? "bg-amber-50 text-amber-700 border-amber-200"
+    : (d.plan === "free" || d.plan === "trial" || d.plan === "expired"
+        ? "bg-gray-100 text-gray-500 border-gray-200"
+        : "bg-purple-50 text-purple-700 border-purple-200");
+  return (
+    <Link
+      href="/dashboard/settings/billing"
+      title={d.onTrial ? d.name + " trial \u2014 " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left" : d.name + " plan"}
+      className={"inline-flex items-center px-1.5 py-1 rounded-md border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap leading-none " + cls}
+    >
+      {label}
+    </Link>
+  );
+}
+
+// Text for the profile dropdown, e.g. "Growth trial \u00b7 9 days left".
+function planMenuText(planInfo) {
+  var d = describePlan(planInfo);
+  if (!d) return "";
+  if (d.onTrial) return d.name + " trial \u00b7 " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left";
+  return d.name + " plan";
+}
+
 export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { planInfo } = useProductFeatures();
   const [dropdownOpen,       setDropdownOpen]       = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [drawerOpen,         setDrawerOpen]         = useState(false);
@@ -372,8 +418,9 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
 
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <img src="/logo-lockup.png" alt="ReviewBooster" className="h-7 w-auto" />
+            <div className="flex flex-col items-start gap-1.5">
+              <img src="/logo-lockup.png" alt="ReviewBooster" className="h-9 w-auto" />
+              <PlanTag planInfo={planInfo} />
             </div>
             <button
               onClick={toggleNotifications}
@@ -476,7 +523,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
 
       {/* -------- MOBILE TOP BAR -------- */}
       <div className="flex md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 z-30 items-center justify-between px-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={function() { setDrawerOpen(true); }}
             className="text-gray-500 hover:text-gray-700 transition-colors"
@@ -485,7 +532,8 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
           >
             <HamburgerIcon />
           </button>
-          <img src="/logo-lockup.png" alt="ReviewBooster" className="h-6 w-auto" />
+          <img src="/logo-lockup.png" alt="ReviewBooster" className="h-10 w-auto shrink-0" />
+          <PlanTag planInfo={planInfo} />
         </div>
 
         <div className="flex items-center gap-2">
@@ -512,7 +560,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               <div className="absolute top-full right-0 mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-gray-900 text-sm font-semibold truncate">{user?.name}</p>
-                  <p className="text-gray-400 text-xs capitalize mt-0.5">{user?.role}</p>
+                  <p className="text-gray-400 text-xs capitalize mt-0.5">{user?.role}{planMenuText(planInfo) ? " \u00b7 " + planMenuText(planInfo) : ""}</p>
                 </div>
                 <button
                   onClick={() => { setDropdownOpen(false); setChangePasswordOpen(true); }}
@@ -631,7 +679,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       >
         <div className="flex items-center justify-between px-5 h-14 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
-            <img src="/logo-lockup.png" alt="ReviewBooster" className="h-6 w-auto" />
+            <img src="/logo-lockup.png" alt="ReviewBooster" className="h-8 w-auto" />
           </div>
           <button
             onClick={function() { setDrawerOpen(false); }}

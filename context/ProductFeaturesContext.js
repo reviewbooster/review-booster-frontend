@@ -17,6 +17,7 @@ const ProductFeaturesContext = createContext({
   seenKeys: [],
   loaded: false,
   markSeen: function() {},
+  planInfo: null,
 });
 
 export function ProductFeaturesProvider({ children }) {
@@ -24,6 +25,7 @@ export function ProductFeaturesProvider({ children }) {
   const [seenKeys, setSeenKeys] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const seenKeysRef = useRef([]);
+  const [planInfo, setPlanInfo] = useState(null);
 
   useEffect(function() {
     if (!user) return;
@@ -32,6 +34,12 @@ export function ProductFeaturesProvider({ children }) {
         var keys = (res.data && res.data.data && res.data.data.product_features_seen) || [];
         seenKeysRef.current = keys;
         setSeenKeys(keys);
+        var d = (res.data && res.data.data) || {};
+        setPlanInfo({
+          effective_plan: d.effective_plan || d.plan || null,
+          plan: d.plan || null,
+          trial_ends_at: d.trial_ends_at || null,
+        });
       })
       .catch(function() {
         // Fall back to "nothing seen yet" rather than blocking the dashboard --
@@ -50,7 +58,7 @@ export function ProductFeaturesProvider({ children }) {
   }, []);
 
   return (
-    <ProductFeaturesContext.Provider value={{ seenKeys: seenKeys, loaded: loaded, markSeen: markSeen }}>
+    <ProductFeaturesContext.Provider value={{ seenKeys: seenKeys, loaded: loaded, markSeen: markSeen, planInfo: planInfo }}>
       {children}
     </ProductFeaturesContext.Provider>
   );
