@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import PlanLockedPanel from '../../components/PlanLockedPanel';
 
 function fmtDate(d) {
   if (!d) return '\u2014';
@@ -19,12 +20,19 @@ function ReferABusinessPage() {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
+  const [locked,  setLocked]  = useState(null);
   const [copied,  setCopied]  = useState(false);
 
   useEffect(function() {
     api.get('/business-referrals/my-stats')
       .then(function(res) { setStats(res.data.data); })
-      .catch(function(err) { setError(err.response?.data?.error || 'Failed to load your referral info.'); })
+      .catch(function(err) {
+        if (err.planLocked) {
+          setLocked({ message: err.lockedMessage, locked: err.planLocked });
+        } else {
+          setError(err.response?.data?.error || 'Failed to load your referral info.');
+        }
+      })
       .finally(function() { setLoading(false); });
   }, []);
 
@@ -55,6 +63,7 @@ function ReferABusinessPage() {
         <p className="page-subtitle">Know another business owner who'd like ReviewBooster? Send them your link.</p>
       </div>
 
+      {locked && <div className="mb-5"><PlanLockedPanel message={locked.message} locked={locked.locked} /></div>}
       {error && <div className="alert-error mb-5"><span>{'!'}</span><span>{error}</span></div>}
 
       {loading ? (

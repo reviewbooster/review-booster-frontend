@@ -14,6 +14,7 @@ import {
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import PlanLockedPanel from '../../components/PlanLockedPanel';
 
 const PERIOD_OPTIONS = [
   { days: 7,  label: 'Last 7 days' },
@@ -92,6 +93,7 @@ function DashboardPage() {
   const [fetching,      setFetching]      = useState(false);
   const [mounted,       setMounted]       = useState(false);
   const [error,         setError]         = useState('');
+  const [chartLocked,   setChartLocked]   = useState(null);
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
 
@@ -131,12 +133,26 @@ function DashboardPage() {
         const query = dateMode === 'range' && rangeStart && rangeEnd
           ? 'start_date=' + rangeStart + '&end_date=' + rangeEnd
           : 'days=' + selectedDays;
-        const [sumRes, chartRes] = await Promise.all([
+        // Independent requests: a locked trend chart must not take the free
+        // summary stats down with it.
+        const [sumR, chartR] = await Promise.allSettled([
           api.get('/analytics/summary?' + query),
           api.get('/analytics/reviews-over-time?' + query),
         ]);
-        setSummary(sumRes.data.data);
-        setChartData(chartRes.data.data || []);
+        if (sumR.status === 'fulfilled') {
+          setSummary(sumR.value.data.data);
+        } else {
+          setError('Failed to load dashboard data.');
+        }
+        if (chartR.status === 'fulfilled') {
+          setChartData(chartR.value.data.data || []);
+          setChartLocked(null);
+        } else if (chartR.reason && chartR.reason.planLocked) {
+          setChartData([]);
+          setChartLocked({ message: chartR.reason.lockedMessage, locked: chartR.reason.planLocked });
+        } else {
+          setError('Failed to load dashboard data.');
+        }
       } catch {
         setError('Failed to load dashboard data.');
       } finally {
@@ -404,7 +420,9 @@ function DashboardPage() {
                 </span>
               </div>
             </div>
-            {!mounted ? (
+            {chartLocked ? (
+              <PlanLockedPanel message={chartLocked.message} locked={chartLocked.locked} />
+            ) : !mounted ? (
               <div className="h-44 bg-gray-50 rounded-xl animate-pulse" />
             ) : (
               <ResponsiveContainer width="100%" height={190}>

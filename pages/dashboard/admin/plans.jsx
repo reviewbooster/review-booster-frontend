@@ -50,10 +50,10 @@ function PlanCard({ plan, onSaved }) {
         limits: {
           customers: form.customers.trim() === '' ? null : Number(form.customers),
           staff:     form.staff.trim() === '' ? null : Number(form.staff),
-          ai_reply:  form.ai_reply,
+          ai_reply:  form.ai_replies.trim() !== '0',
           engine_a:  form.engine_a,
           engine_b:  form.engine_b,
-          win_back:  form.win_back,
+          win_back:  form.win_back_contacts.trim() !== '0',
           analytics: form.analytics,
           custom_templates:  form.custom_templates,
           review_requests:   form.review_requests.trim() === '' ? null : Number(form.review_requests),
@@ -93,7 +93,7 @@ function PlanCard({ plan, onSaved }) {
           <input className="input" value={form.name} onChange={function(e) { set('name', e.target.value); }} />
         </div>
         <div>
-          <label className="label">Price / month (\u20b9)</label>
+          <label className="label">{'Price / month (\u20b9)'}</label>
           <input className="input" type="number" min="0" value={form.price_monthly} onChange={function(e) { set('price_monthly', e.target.value); }} />
         </div>
       </div>
@@ -126,7 +126,7 @@ function PlanCard({ plan, onSaved }) {
         </div>
       </div>
 
-      <p className="text-xs font-semibold text-gray-700 mb-3">{'Monthly Quotas \u2014 new pricing model (not yet enforced)'}</p>
+      <p className="text-xs font-semibold text-gray-700 mb-3">{'Monthly Quotas \u2014 reset on the 1st of every month (0 = not available on this plan)'}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <div>
           <label className="label">Review Requests / month</label>
@@ -156,19 +156,16 @@ function PlanCard({ plan, onSaved }) {
         <div>
           <label className="label">Locations</label>
           <input className="input" type="number" min="1" value={form.locations} onChange={function(e) { set('locations', e.target.value); }} />
-          <p className="text-[10px] text-gray-400 mt-1">Display only \u2014 not enforced yet.</p>
+          <p className="text-[10px] text-gray-400 mt-1">{'Display only \u2014 not enforced yet.'}</p>
         </div>
       </div>
 
       <div className="h-px bg-gray-100 my-4" />
 
-      <p className="text-xs font-semibold text-gray-700 mb-3">{'Feature Toggles \u2014 currently enforced'}</p>
+      <p className="text-xs font-semibold text-gray-700 mb-3">{'Feature Toggles'}</p>
 
       <div className="space-y-2 mb-4">
-        <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
-          <span className="text-sm text-gray-700">AI Reply Drafts</span>
-          <input type="checkbox" checked={form.ai_reply} onChange={function(e) { set('ai_reply', e.target.checked); }} />
-        </label>
+
         <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
           <span className="text-sm text-gray-700">Customer Referrals (Engine A)</span>
           <input type="checkbox" checked={form.engine_a} onChange={function(e) { set('engine_a', e.target.checked); }} />
@@ -177,10 +174,7 @@ function PlanCard({ plan, onSaved }) {
           <span className="text-sm text-gray-700">Refer a Business (Engine B)</span>
           <input type="checkbox" checked={form.engine_b} onChange={function(e) { set('engine_b', e.target.checked); }} />
         </label>
-        <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
-          <span className="text-sm text-gray-700">Win-Back Campaigns</span>
-          <input type="checkbox" checked={form.win_back} onChange={function(e) { set('win_back', e.target.checked); }} />
-        </label>
+
         <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">
           <span className="text-sm text-gray-700">Advanced Analytics</span>
           <input type="checkbox" checked={form.analytics} onChange={function(e) { set('analytics', e.target.checked); }} />
@@ -201,10 +195,40 @@ function PlanCard({ plan, onSaved }) {
   );
 }
 
+// Compact tile shown in the list -- tapping it opens that plan's settings.
+function PlanSummary({ plan, onOpen }) {
+  var l = plan.limits || {};
+  var fmt = function(n) { return n == null ? 'Unlimited' : Number(n).toLocaleString('en-IN'); };
+  var active = plan.is_active !== false;
+  var priceText = plan.price_monthly > 0
+    ? '\u20B9' + Number(plan.price_monthly).toLocaleString('en-IN') + '/month'
+    : (plan.slug === 'free' ? 'Free' : 'Price not set');
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="text-left w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-purple-300 hover:shadow transition-all">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">{plan.name || plan.slug}</h3>
+          <p className={'text-lg font-bold mt-0.5 ' + (priceText === 'Price not set' ? 'text-amber-600' : 'text-gray-900')}>{priceText}</p>
+        </div>
+        <span className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500')}>
+          {active ? 'Active' : 'Hidden'}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500">{fmt(l.review_requests) + ' requests/mo \u00b7 ' + fmt(l.customers) + ' customers \u00b7 ' + fmt(l.ai_replies) + ' AI replies'}</p>
+      <p className="text-[11px] text-purple-600 font-semibold mt-3">{'Tap to edit settings \u2192'}</p>
+    </button>
+  );
+}
+
 function PlansPage() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [selectedSlug, setSelectedSlug] = useState(null);
 
   useEffect(function() {
     api.get('/admin/plans')
@@ -219,6 +243,8 @@ function PlansPage() {
     });
   };
 
+  var selected = plans.find(function(p) { return p.slug === selectedSlug; }) || null;
+
   return (
     <DashboardLayout>
       <h1 className="text-xl font-bold text-gray-900 mb-1">Plans & Feature Limits</h1>
@@ -231,11 +257,29 @@ function PlansPage() {
       {loading ? (
         <p className="text-sm text-gray-400">Loading...</p>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {plans.map(function(plan) {
-            return <PlanCard key={plan.slug} plan={plan} onSaved={handleSaved} />;
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {plans.map(function(plan) {
+              return <PlanSummary key={plan.slug} plan={plan} onOpen={function() { setSelectedSlug(plan.slug); }} />;
+            })}
+          </div>
+
+          {selected && (
+            <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto">
+              <div className="w-full max-w-2xl my-4">
+                <div className="flex justify-end mb-2">
+                  <button
+                    type="button"
+                    onClick={function() { setSelectedSlug(null); }}
+                    className="bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow">
+                    {'Close \u2715'}
+                  </button>
+                </div>
+                <PlanCard key={selected.slug} plan={selected} onSaved={handleSaved} />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </DashboardLayout>
   );

@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import PlanLockedPanel from '../../components/PlanLockedPanel';
 import { waLinkProps } from '../../lib/waLink';
 
 // "Hi {name}," is always the start of the message -- fixed so personalization
@@ -37,6 +38,7 @@ function WinBackPage() {
   const [summary,  setSummary]  = useState({ due_count: 0, returned_count: 0 });
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState('');
+  const [locked,   setLocked]   = useState(null);
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
 
@@ -76,7 +78,11 @@ function WinBackPage() {
         setGoogleReviewUrl(bizRes.data.data.google_review_url || '');
       }
     } catch (e) {
-      setError('Failed to load win-back info.');
+      if (e && e.planLocked) {
+        setLocked({ message: e.lockedMessage, locked: e.planLocked });
+      } else {
+        setError('Failed to load win-back info.');
+      }
     } finally {
       setLoading(false);
     }
@@ -135,6 +141,7 @@ function WinBackPage() {
         <p className="page-subtitle">Remind customers who haven't been back in a while.</p>
       </div>
 
+      {locked && <div className="mb-5"><PlanLockedPanel message={locked.message} locked={locked.locked} /></div>}
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
 
       {!loading && enabled && (

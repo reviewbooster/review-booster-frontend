@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import Sidebar from "./Sidebar";
 import InstallAppBanner from './InstallAppBanner';
 import SpotlightTour from './SpotlightTour';
+import PlanLockedModal from './PlanLockedModal';
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { ProductFeaturesProvider } from "../context/ProductFeaturesContext";
@@ -61,6 +62,7 @@ export default function DashboardLayout({ children, title, subtitle, showBack = 
           {children}
         </main>
         <SpotlightTour />
+        <PlanLockedModal />
       </div>
     </ProductFeaturesProvider>
   );
