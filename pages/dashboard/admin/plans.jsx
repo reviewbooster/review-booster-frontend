@@ -196,7 +196,7 @@ function PlanCard({ plan, onSaved }) {
 }
 
 // Compact tile shown in the list -- tapping it opens that plan's settings.
-function PlanSummary({ plan, onOpen }) {
+function PlanSummary({ plan, onOpen, open }) {
   var l = plan.limits || {};
   var fmt = function(n) { return n == null ? 'Unlimited' : Number(n).toLocaleString('en-IN'); };
   var active = plan.is_active !== false;
@@ -207,7 +207,7 @@ function PlanSummary({ plan, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="text-left w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-purple-300 hover:shadow transition-all">
+      className={'text-left w-full bg-white rounded-2xl border shadow-sm p-5 transition-all hover:border-purple-300 ' + (open ? 'border-purple-300 ring-2 ring-purple-100' : 'border-gray-100')}>
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="text-base font-bold text-gray-900">{plan.name || plan.slug}</h3>
@@ -218,7 +218,7 @@ function PlanSummary({ plan, onOpen }) {
         </span>
       </div>
       <p className="text-xs text-gray-500">{fmt(l.review_requests) + ' requests/mo \u00b7 ' + fmt(l.customers) + ' customers \u00b7 ' + fmt(l.ai_replies) + ' AI replies'}</p>
-      <p className="text-[11px] text-purple-600 font-semibold mt-3">{'Tap to edit settings \u2192'}</p>
+      <p className="text-[11px] text-purple-600 font-semibold mt-3">{open ? 'Hide settings \u2191' : 'Tap to edit settings \u2193'}</p>
     </button>
   );
 }
@@ -243,7 +243,6 @@ function PlansPage() {
     });
   };
 
-  var selected = plans.find(function(p) { return p.slug === selectedSlug; }) || null;
 
   return (
     <DashboardLayout>
@@ -257,29 +256,21 @@ function PlansPage() {
       {loading ? (
         <p className="text-sm text-gray-400">Loading...</p>
       ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {plans.map(function(plan) {
-              return <PlanSummary key={plan.slug} plan={plan} onOpen={function() { setSelectedSlug(plan.slug); }} />;
-            })}
-          </div>
-
-          {selected && (
-            <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-sm overflow-y-auto">
-              <div className="w-full max-w-2xl my-4">
-                <div className="flex justify-end mb-2">
-                  <button
-                    type="button"
-                    onClick={function() { setSelectedSlug(null); }}
-                    className="bg-white text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-full shadow">
-                    {'Close \u2715'}
-                  </button>
-                </div>
-                <PlanCard key={selected.slug} plan={selected} onSaved={handleSaved} />
+        <div className="space-y-3 max-w-3xl">
+          {plans.map(function(plan) {
+            var open = selectedSlug === plan.slug;
+            return (
+              <div key={plan.slug}>
+                <PlanSummary plan={plan} open={open} onOpen={function() { setSelectedSlug(open ? null : plan.slug); }} />
+                {open && (
+                  <div className="mt-2">
+                    <PlanCard key={plan.slug} plan={plan} onSaved={handleSaved} />
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-        </>
+            );
+          })}
+        </div>
       )}
     </DashboardLayout>
   );
