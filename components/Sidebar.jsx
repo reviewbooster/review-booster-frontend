@@ -419,7 +419,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         <div className="px-6 py-5 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div className="flex flex-col items-start gap-1.5">
-              <img src="/logo-lockup.png" alt="ReviewBooster" className="h-9 w-auto" />
+              <img src="/logo-lockup.png" alt="ReviewBooster" className="h-8 w-auto -ml-5 pointer-events-none" />
               <PlanTag planInfo={planInfo} />
             </div>
             <button
@@ -532,7 +532,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
           >
             <HamburgerIcon />
           </button>
-          <img src="/logo-lockup.png" alt="ReviewBooster" className="h-10 w-auto shrink-0" />
+          <img src="/logo-lockup.png" alt="ReviewBooster" className="h-8 w-auto shrink-0 -ml-4 -mr-4 pointer-events-none" />
           <PlanTag planInfo={planInfo} />
         </div>
 
@@ -679,7 +679,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
       >
         <div className="flex items-center justify-between px-5 h-14 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
-            <img src="/logo-lockup.png" alt="ReviewBooster" className="h-8 w-auto" />
+            <img src="/logo-lockup.png" alt="ReviewBooster" className="h-7 w-auto -ml-4 pointer-events-none" />
           </div>
           <button
             onClick={function() { setDrawerOpen(false); }}
