@@ -538,7 +538,7 @@ function DashboardPage() {
             </div>
           )}
         </div>
-        {businessPlan === 'trial' && trialDaysLeft !== null && (
+        {(businessPlan === 'trial' || (businessPlan === 'free' && !trialExpired)) && trialDaysLeft !== null && (
           <p className={'text-[11px] font-medium mt-2.5 ' + (trialExpired ? 'text-red-600' : 'text-purple-600')}>
             {trialExpired
               ? 'Your trial has expired \u00b7 '

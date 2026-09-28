@@ -53,6 +53,9 @@ function BillingSettingsPage() {
   }
 
   var planColor = PLAN_COLORS[business?.plan] || PLAN_COLORS.trial;
+  // New model: a business is "on trial" while trial_ends_at is in the future,
+  // whatever plan it's stored as (normally 'free').
+  var onTrial = !!(business && business.trial_ends_at && new Date(business.trial_ends_at).getTime() > Date.now());
 
   return (
     <DashboardLayout>
@@ -77,9 +80,9 @@ function BillingSettingsPage() {
                 </span>
               </div>
               <div>
-                <p className="text-xs text-gray-400 mb-1">{business?.plan === 'trial' ? 'Trial Ends' : 'Plan Expires'}</p>
+                <p className="text-xs text-gray-400 mb-1">{(business?.plan === 'trial' || onTrial) ? 'Trial Ends' : 'Plan Expires'}</p>
                 <p className="text-gray-900 font-medium text-sm">
-                  {business?.trial_ends_at
+                  {(business?.plan === 'trial' || onTrial) && business?.trial_ends_at
                     ? new Date(business.trial_ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                     : '-'}
                 </p>

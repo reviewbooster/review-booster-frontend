@@ -25,6 +25,12 @@ function PlanCard({ plan, onSaved }) {
     win_back: !!(plan.limits && plan.limits.win_back),
     analytics: !!(plan.limits && plan.limits.analytics),
     custom_templates: !!(plan.limits && plan.limits.custom_templates),
+    review_requests: (plan.limits && plan.limits.review_requests != null) ? String(plan.limits.review_requests) : '',
+    sms: (plan.limits && plan.limits.sms != null) ? String(plan.limits.sms) : '',
+    ai_replies: (plan.limits && plan.limits.ai_replies != null) ? String(plan.limits.ai_replies) : '',
+    follow_ups: (plan.limits && plan.limits.follow_ups != null) ? String(plan.limits.follow_ups) : '',
+    win_back_contacts: (plan.limits && plan.limits.win_back_contacts != null) ? String(plan.limits.win_back_contacts) : '',
+    locations: (plan.limits && plan.limits.locations != null) ? String(plan.limits.locations) : '1',
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -49,7 +55,13 @@ function PlanCard({ plan, onSaved }) {
           engine_b:  form.engine_b,
           win_back:  form.win_back,
           analytics: form.analytics,
-          custom_templates: form.custom_templates,
+          custom_templates:  form.custom_templates,
+          review_requests:   form.review_requests.trim() === '' ? null : Number(form.review_requests),
+          sms:               form.sms.trim() === '' ? null : Number(form.sms),
+          ai_replies:        form.ai_replies.trim() === '' ? null : Number(form.ai_replies),
+          follow_ups:        form.follow_ups.trim() === '' ? null : Number(form.follow_ups),
+          win_back_contacts: form.win_back_contacts.trim() === '' ? null : Number(form.win_back_contacts),
+          locations:         form.locations.trim() === '' ? 1 : Number(form.locations),
         },
       };
       var res = await api.patch('/admin/plans/' + plan.slug, payload);
@@ -113,6 +125,44 @@ function PlanCard({ plan, onSaved }) {
           <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited.</p>
         </div>
       </div>
+
+      <p className="text-xs font-semibold text-gray-700 mb-3">{'Monthly Quotas \u2014 new pricing model (not yet enforced)'}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="label">Review Requests / month</label>
+          <input className="input" type="number" min="0" placeholder="Unlimited" value={form.review_requests} onChange={function(e) { set('review_requests', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited.</p>
+        </div>
+        <div>
+          <label className="label">SMS / month</label>
+          <input className="input" type="number" min="0" placeholder="Unlimited" value={form.sms} onChange={function(e) { set('sms', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited, 0 for unavailable.</p>
+        </div>
+        <div>
+          <label className="label">AI Reply Generations / month</label>
+          <input className="input" type="number" min="0" placeholder="Unlimited" value={form.ai_replies} onChange={function(e) { set('ai_replies', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited, 0 for unavailable.</p>
+        </div>
+        <div>
+          <label className="label">Follow-ups / month</label>
+          <input className="input" type="number" min="0" placeholder="Unlimited" value={form.follow_ups} onChange={function(e) { set('follow_ups', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited, 0 for unavailable.</p>
+        </div>
+        <div>
+          <label className="label">Win-Back Contacts / month</label>
+          <input className="input" type="number" min="0" placeholder="Unlimited" value={form.win_back_contacts} onChange={function(e) { set('win_back_contacts', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Leave blank for unlimited, 0 for unavailable.</p>
+        </div>
+        <div>
+          <label className="label">Locations</label>
+          <input className="input" type="number" min="1" value={form.locations} onChange={function(e) { set('locations', e.target.value); }} />
+          <p className="text-[10px] text-gray-400 mt-1">Display only \u2014 not enforced yet.</p>
+        </div>
+      </div>
+
+      <div className="h-px bg-gray-100 my-4" />
+
+      <p className="text-xs font-semibold text-gray-700 mb-3">{'Feature Toggles \u2014 currently enforced'}</p>
 
       <div className="space-y-2 mb-4">
         <label className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 cursor-pointer">

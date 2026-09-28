@@ -16,8 +16,64 @@ function daysLeft(dateStr) {
   return Math.ceil(diff / (24 * 60 * 60 * 1000));
 }
 
+// One "used / limit" row with a progress bar. A null limit means unlimited
+// (the server sends Infinity as null). Bar shifts amber at 70% and red at
+// 90% so a limit never arrives as a surprise.
+function UsageMeter({ label, used, limit }) {
+  if (limit == null) {
+    return (
+      <div className="flex items-center justify-between py-2.5">
+        <span className="text-xs text-gray-600">{label}</span>
+        <span className="text-xs text-gray-400">Unlimited</span>
+      </div>
+    );
+  }
+  var pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100;
+  var barColor = pct >= 90 ? 'bg-red-500' : (pct >= 70 ? 'bg-amber-500' : 'bg-purple-500');
+  return (
+    <div className="py-2.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-gray-600">{label}</span>
+        <span className="text-xs text-gray-500">
+          {limit === 0 ? 'Not available on this plan' : used + ' / ' + limit}
+        </span>
+      </div>
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className={'h-full rounded-full ' + barColor} style={{ width: pct + '%' }} />
+      </div>
+    </div>
+  );
+}
+
 function StatusBanner({ status }) {
   if (!status) return null;
+
+  // New model: every business is stored as a real plan (normally 'free'),
+  // and a 14-day trial window grants Growth-level access on top of it --
+  // so "on trial" means trial_ends_at is in the future, not plan === 'trial'.
+  if (!status.is_suspended && status.plan !== 'trial') {
+    var newTrialLeft = daysLeft(status.trial_ends_at);
+    if (newTrialLeft !== null && newTrialLeft >= 0) {
+      return (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 mb-6">
+          <p className="text-sm font-semibold text-amber-700">
+            {(status.effective_plan ? status.effective_plan.charAt(0).toUpperCase() + status.effective_plan.slice(1) : 'Growth') + ' trial \u2014 ' + newTrialLeft + ' day' + (newTrialLeft === 1 ? '' : 's') + ' left'}
+          </p>
+          <p className="text-xs text-amber-600 mt-1">
+            You have full access to this plan's features during your trial. After it ends you move to the Free plan automatically, unless you pick a plan below.
+          </p>
+        </div>
+      );
+    }
+    if (status.plan === 'free') {
+      return (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 mb-6">
+          <p className="text-sm font-semibold text-gray-700">Free plan</p>
+          <p className="text-xs text-gray-500 mt-1">Upgrade any time for more capacity and features.</p>
+        </div>
+      );
+    }
+  }
 
   if (status.is_suspended) {
     return (
@@ -254,6 +310,21 @@ export default function BillingPanel() {
         <>
           <StatusBanner status={status} />
 
+          {status && status.usage && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 md:p-5 mb-6">
+              <p className="text-sm font-semibold text-gray-900 mb-1">Usage This Month</p>
+              <p className="text-xs text-gray-400 mb-2">Resets on the 1st of every month.</p>
+              <div className="divide-y divide-gray-50">
+                <UsageMeter label="Review requests" used={status.usage.review_requests.used} limit={status.usage.review_requests.limit} />
+                <UsageMeter label="SMS" used={status.usage.sms.used} limit={status.usage.sms.limit} />
+                <UsageMeter label="AI reply generations" used={status.usage.ai_replies.used} limit={status.usage.ai_replies.limit} />
+                <UsageMeter label="Follow-ups" used={status.usage.follow_ups.used} limit={status.usage.follow_ups.limit} />
+                <UsageMeter label="Win-back contacts" used={status.usage.win_back_contacts.used} limit={status.usage.win_back_contacts.limit} />
+                <UsageMeter label="Customers stored" used={status.usage.customers.used} limit={status.usage.customers.limit} />
+              </div>
+            </div>
+          )}
+
           {plans.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
               <div className="empty-state">
@@ -263,7 +334,7 @@ export default function BillingPanel() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
               {plans.map(function(plan) {
                 var isCurrent = status && status.plan === plan.slug && !status.is_suspended;
                 return (
@@ -275,9 +346,12 @@ export default function BillingPanel() {
                     {isCurrent && (
                       <span className="badge badge-blue self-start mb-3">Current Plan</span>
                     )}
+                    {!isCurrent && plan.slug === 'growth' && (
+                      <span className="badge badge-blue self-start mb-3">Most popular</span>
+                    )}
                     <h3 className="text-base md:text-lg font-bold text-gray-900">{plan.name}</h3>
                     <p className="text-xl md:text-2xl font-bold text-gray-900 mt-1.5 md:mt-2 mb-1">
-                      {plan.price_monthly > 0 ? '\u20B9' + plan.price_monthly : 'Contact us'}
+                      {plan.price_monthly > 0 ? '\u20B9' + plan.price_monthly : (plan.slug === 'free' ? 'Free' : 'Contact us')}
                       {plan.price_monthly > 0 && <span className="text-sm font-normal text-gray-400">/mo</span>}
                     </p>
                     <ul className="space-y-1.5 md:space-y-2 my-3 md:my-4 flex-1">
@@ -292,13 +366,19 @@ export default function BillingPanel() {
                         );
                       })}
                     </ul>
-                    <button
-                      onClick={function() { setSelectedPlan(plan); }}
-                      disabled={isCurrent}
-                      className={isCurrent ? 'btn-secondary w-full justify-center opacity-60 cursor-not-allowed' : 'btn-primary w-full justify-center'}
-                    >
-                      {isCurrent ? 'Active' : 'Upgrade to ' + plan.name}
-                    </button>
+                    {plan.slug === 'free' ? (
+                      <p className="text-xs text-gray-400 text-center py-2">
+                        {isCurrent ? 'Your current plan' : 'Included with every account'}
+                      </p>
+                    ) : (
+                      <button
+                        onClick={function() { setSelectedPlan(plan); }}
+                        disabled={isCurrent}
+                        className={isCurrent ? 'btn-secondary w-full justify-center opacity-60 cursor-not-allowed' : 'btn-primary w-full justify-center'}
+                      >
+                        {isCurrent ? 'Active' : 'Upgrade to ' + plan.name}
+                      </button>
+                    )}
                   </div>
                 );
               })}

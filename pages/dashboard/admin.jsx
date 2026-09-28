@@ -462,14 +462,14 @@ function ViewQrModal({ business, onClose }) {
   );
 }
 
-const BILLING_PLAN_SLUGS = ['trial', 'basic', 'pro', 'agency'];
+const BILLING_PLAN_SLUGS = ['starter', 'growth', 'pro', 'trial'];
 
 function BillingSettingsModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState('');
   const [plans,   setPlans]   = useState([]);       // [{ slug, name, price_monthly, featuresText, is_active }]
-  const [settings, setSettings] = useState({ upi_id: '', upi_payee_name: '', contact_whatsapp: '', instructions: '' });
+  const [settings, setSettings] = useState({ upi_id: '', upi_payee_name: '', contact_whatsapp: '', instructions: '', trial_days: '14', trial_plan: 'growth' });
 
   useEffect(function() {
     setLoading(true);
@@ -494,6 +494,8 @@ function BillingSettingsModal({ onClose, onSaved }) {
         upi_payee_name: settingsData.upi_payee_name || '',
         contact_whatsapp: settingsData.contact_whatsapp || '',
         instructions: settingsData.instructions || '',
+        trial_days: settingsData.trial_days != null ? String(settingsData.trial_days) : '14',
+        trial_plan: settingsData.trial_plan || 'growth',
       });
     }).catch(function() {
       setError('Failed to load billing settings.');
@@ -619,6 +621,27 @@ function BillingSettingsModal({ onClose, onSaved }) {
                       onChange={function(e) { setSettings(function(s) { return { ...s, instructions: e.target.value }; }); }}
                     />
                   </div>
+                  <div className="pt-3 border-t border-gray-100">
+                    <p className="text-xs font-semibold text-gray-700 mb-3">Free trial for new signups</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Trial length (days)</label>
+                        <input className="input" type="number" min="1" max="90"
+                          value={settings.trial_days}
+                          onChange={function(e) { setSettings(function(s) { return { ...s, trial_days: e.target.value }; }); }} />
+                      </div>
+                      <div>
+                        <label className="label">Trial gives access to</label>
+                        <select className="input" value={settings.trial_plan}
+                          onChange={function(e) { setSettings(function(s) { return { ...s, trial_plan: e.target.value }; }); }}>
+                          <option value="starter">Starter</option>
+                          <option value="growth">Growth</option>
+                          <option value="pro">Pro</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2">Length applies to new signups only; existing trials keep their end date. The plan applies to everyone currently on a trial, immediately. When a trial ends, the business moves to the Free plan.</p>
+                  </div>
                 </div>
               </div>
             </>
@@ -636,7 +659,7 @@ function BillingSettingsModal({ onClose, onSaved }) {
 }
 
 function ActivatePlanModal({ business, onClose, onActivated }) {
-  const [plan,    setPlan]    = useState('basic');
+  const [plan,    setPlan]    = useState('starter');
   const [days,    setDays]    = useState(30);
   const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -670,7 +693,7 @@ function ActivatePlanModal({ business, onClose, onActivated }) {
             <label className="label">Plan</label>
             <select className="input" value={plan} onChange={function(e) { setPlan(e.target.value); }}>
               {BILLING_PLAN_SLUGS.map(function(slug) {
-                return <option key={slug} value={slug}>{slug.charAt(0).toUpperCase() + slug.slice(1)}</option>;
+                return <option key={slug} value={slug}>{slug === 'trial' ? 'Extend trial (days from today)' : slug.charAt(0).toUpperCase() + slug.slice(1)}</option>;
               })}
             </select>
           </div>

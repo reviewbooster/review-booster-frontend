@@ -65,7 +65,11 @@ function BusinessDetailPage() {
       .finally(function() { setLoading(false); });
   }, [id]);
 
-  var expiryDate = data && (data.business.plan === 'trial' ? data.business.trial_ends_at : data.business.plan_expires_at);
+  // Trial model: "on trial" = stored as Free (or the legacy 'trial') with a
+  // trial end date still in the future -- not just plan === 'trial'.
+  var onTrial = !!(data && (data.business.plan === 'trial' ||
+    (data.business.plan === 'free' && data.business.trial_ends_at && new Date(data.business.trial_ends_at).getTime() > Date.now())));
+  var expiryDate = data && (onTrial ? data.business.trial_ends_at : data.business.plan_expires_at);
   var expiryDays = daysLeft(expiryDate);
   var expiryUrgent = expiryDays !== null && expiryDays <= 3;
   var expiryWarn = expiryDays !== null && expiryDays > 3 && expiryDays <= 7;
@@ -109,7 +113,7 @@ function BusinessDetailPage() {
             </div>
             <div className="text-right shrink-0">
               <p className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">
-                {data.business.plan === 'trial' ? 'Trial ends' : 'Plan expires'}
+                {onTrial ? 'Trial ends' : 'Plan expires'}
               </p>
               <p className="text-sm font-bold text-gray-900">{fmtDate(expiryDate)}</p>
               {expiryDays !== null && (
@@ -173,7 +177,7 @@ function BusinessDetailPage() {
                 <PlanBadge plan={data.business.plan} />
               </div>
               <div>
-                <p className="text-gray-400 text-xs mb-1">{data.business.plan === 'trial' ? 'Trial ends' : 'Plan expires'}</p>
+                <p className="text-gray-400 text-xs mb-1">{onTrial ? 'Trial ends' : 'Plan expires'}</p>
                 <p className="font-semibold text-gray-900">{fmtDate(expiryDate)}</p>
               </div>
               {data.business.referred_by_business_id && (
