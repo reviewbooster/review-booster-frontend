@@ -64,6 +64,8 @@ export default function OnboardingPage() {
   // Google Link
   const [googleUrl, setGoogleUrl] = useState('');
   const [showGoogleHelp, setShowGoogleHelp] = useState(false);
+  const [gCount, setGCount] = useState('');
+  const [gRating, setGRating] = useState('');
 
   useEffect(function() {
     if (authLoading) return;
@@ -129,12 +131,32 @@ export default function OnboardingPage() {
     goNext({ name: name.trim(), type, type_other: type === 'other' ? typeOther.trim() : '' });
   };
 
-  const handleGoogleNext = (e) => {
+  const handleGoogleNext = async (e) => {
     e.preventDefault();
     var trimmed = googleUrl.trim();
     if (trimmed && !trimmed.startsWith('https://')) {
       setError('This must be a secure link starting with https://');
       return;
+    }
+    // Optional: the owner's current Google numbers, saved as their starting
+    // point for the "Your results" comparison later.
+    var countText = gCount.trim();
+    var baseline = null;
+    if (countText !== '') {
+      if (!/^\d+$/.test(countText)) {
+        setError('Enter your Google review count as a whole number, e.g. 182.');
+        return;
+      }
+      var countNum = parseInt(countText, 10);
+      var ratingNum = Number(gRating);
+      if (countNum > 0 && !(ratingNum >= 1 && ratingNum <= 5)) {
+        setError('Enter your Google rating between 1 and 5, e.g. 4.3.');
+        return;
+      }
+      baseline = { kind: 'baseline', review_count: countNum, rating: countNum > 0 ? ratingNum : null };
+    }
+    if (baseline) {
+      try { await api.put('/business/my-google-numbers', baseline); } catch (err) { /* optional -- never block setup on it */ }
     }
     goNext(trimmed ? { google_review_url: trimmed } : null);
   };
@@ -288,6 +310,25 @@ export default function OnboardingPage() {
                     <p>{'3. Copy the link Google shows you, and paste it above.'}</p>
                   </div>
                 )}
+
+                <div className="pt-3 mt-1 border-t border-white/10">
+                  <p className="text-white/70 text-sm font-semibold">Optional: your Google numbers today</p>
+                  <p className="text-white/35 text-xs mt-0.5 mb-3">So you can see how much you grow. You'll find both on your Google Business Profile.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="number" inputMode="numeric" min="0" value={gCount}
+                      onChange={(e) => setGCount(e.target.value)}
+                      placeholder="Reviews, e.g. 182"
+                      className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
+                    />
+                    <input
+                      type="number" inputMode="decimal" step="0.1" min="1" max="5" value={gRating}
+                      onChange={(e) => setGRating(e.target.value)}
+                      placeholder="Rating, e.g. 4.3"
+                      className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
+                    />
+                  </div>
+                </div>
 
                 <button
                   type="submit"

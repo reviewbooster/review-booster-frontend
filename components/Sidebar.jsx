@@ -72,11 +72,12 @@ const ADMIN_NAV_GROUPS = [
   { header: "Business", items: [
     { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "Businesses" },
     { href: "/dashboard/admin/plans", icon: "\uD83D\uDCB3", label: "Plans" },
-    { href: "/dashboard/admin?modal=billing", icon: "\uD83D\uDCB0", label: "Billing Settings" },
+    { href: "/dashboard/admin/billing-settings", icon: "\uD83D\uDCB0", label: "Billing Settings" },
   ]},
   { header: "Growth", items: [
     { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates" },
-    { href: "/dashboard/admin?modal=referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
+    { href: "/dashboard/admin/business-referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
+    { href: "/dashboard/admin/success-stories", icon: "\u2B50", label: "Success Stories" },
   ]},
   { header: "Operations", items: [
     { href: "/dashboard/requests", icon: "\uD83D\uDD13", label: "Requests" },

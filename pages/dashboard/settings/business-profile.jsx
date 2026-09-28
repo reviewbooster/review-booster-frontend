@@ -10,6 +10,7 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import withAuth from '../../../components/withAuth';
 import api from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
+import GoogleNumbersCard from '../../../components/GoogleNumbersCard';
 
 function BusinessProfilePage() {
   const { user } = useAuth();
@@ -311,6 +312,10 @@ function BusinessProfilePage() {
             </div>
           )}
         </form>
+
+        <div className="mt-6">
+          <GoogleNumbersCard readOnly={isStaff} />
+        </div>
       </div>
     </DashboardLayout>
   );
