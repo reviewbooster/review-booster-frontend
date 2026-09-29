@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/admin/businesses/[id].jsx
  * Business 360 — everything about one business in one place, instead of
  * nothing. Read-only rollup: customers, reviews, feedback, referrals,
@@ -21,14 +21,19 @@ function daysLeft(d) {
 }
 
 var PLAN_COLORS = {
-  trial:  { bg: 'bg-amber-50',  text: 'text-amber-600' },
-  basic:  { bg: 'bg-blue-50',   text: 'text-blue-600' },
-  pro:    { bg: 'bg-indigo-50', text: 'text-indigo-600' },
-  agency: { bg: 'bg-purple-50', text: 'text-purple-600' },
+  // Current tiers
+  free:    { bg: 'bg-gray-100',   text: 'text-gray-600' },
+  starter: { bg: 'bg-blue-50',    text: 'text-blue-600' },
+  growth:  { bg: 'bg-emerald-50', text: 'text-emerald-600' },
+  pro:     { bg: 'bg-indigo-50',  text: 'text-indigo-600' },
+  // Legacy tiers -- kept only for any business not yet migrated
+  trial:   { bg: 'bg-amber-50',  text: 'text-amber-600' },
+  basic:   { bg: 'bg-blue-50',   text: 'text-blue-600' },
+  agency:  { bg: 'bg-purple-50', text: 'text-purple-600' },
 };
 
 function PlanBadge({ plan }) {
-  var c = PLAN_COLORS[plan] || PLAN_COLORS.trial;
+  var c = PLAN_COLORS[plan] || PLAN_COLORS.free;
   return (
     <span className={'text-xs font-semibold px-2.5 py-1 rounded-full capitalize ' + c.bg + ' ' + c.text}>
       {plan}

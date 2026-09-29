@@ -64,27 +64,27 @@ const ADMIN_NAV = [
 ];
 
 // Grouped -- used for the desktop sidebar, matching the Super Admin doc's
-// section headers (Overview / Business / Growth / Operations / System).
+// section headers (Overview / Businesses / Growth / Operations / System).
 const ADMIN_NAV_GROUPS = [
   { header: "Overview", items: [
     { href: "/dashboard/admin/dashboard", icon: "\uD83D\uDCCA", label: "Dashboard" },
   ]},
-  { header: "Business", items: [
-    { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "Businesses" },
+  { header: "Businesses", items: [
+    { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "All Businesses" },
     { href: "/dashboard/admin/plans", icon: "\uD83D\uDCB3", label: "Plans" },
     { href: "/dashboard/admin/billing-settings", icon: "\uD83D\uDCB0", label: "Billing Settings" },
   ]},
   { header: "Growth", items: [
-    { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates" },
     { href: "/dashboard/admin/business-referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
     { href: "/dashboard/admin/success-stories", icon: "\u2B50", label: "Success Stories" },
   ]},
   { header: "Operations", items: [
     { href: "/dashboard/requests", icon: "\uD83D\uDD13", label: "Requests" },
+    { href: "/dashboard/admin/support-chats", icon: "\uD83D\uDCAC", label: "Support Chats" },
+    { href: "/dashboard/admin/audit-log", icon: "\uD83D\uDCCB", label: "Audit Log" },
   ]},
   { header: "System", items: [
-    { href: "/dashboard/admin/audit-log", icon: "\uD83D\uDCCB", label: "Audit Log" },
-    { href: "/dashboard/admin/support-chats", icon: "\uD83D\uDCAC", label: "Support Chats" },
+    { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates" },
   ]},
 ];
 
