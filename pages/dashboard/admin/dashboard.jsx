@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts';
 import DashboardLayout from '../../../components/DashboardLayout';
 import withAuth from '../../../components/withAuth';
 import api from '../../../lib/api';
@@ -34,6 +35,36 @@ function fmtRelative(d) {
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   return days + ' days ago';
+}
+
+function fmtWeek(d) {
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function GrowthTrendChart({ data }) {
+  if (!data || data.length === 0) return null;
+  var chartData = data.map(function(b) { return { label: fmtWeek(b.week_start), count: b.count, week_start: b.week_start }; });
+  var total = data.reduce(function(s, b) { return s + b.count; }, 0);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">New Businesses</p>
+        <p className="text-xs text-gray-400">{'+' + total + ' in the last ' + data.length + ' weeks'}</p>
+      </div>
+      <div style={{ height: 180 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -22 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} width={28} />
+            <Tooltip formatter={function(v) { return [v, 'New businesses']; }} labelFormatter={function(l) { return 'Week of ' + l; }} />
+            <Bar dataKey="count" fill="#7C3AED" radius={[6, 6, 0, 0]} maxBarSize={36} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 
 function NeedsAttentionSection({ data }) {
@@ -120,6 +151,7 @@ function DashboardPage() {
   const router = useRouter();
   const [stats,          setStats]          = useState(null);
   const [needsAttention, setNeedsAttention]  = useState(null);
+  const [growthTrend,    setGrowthTrend]    = useState(null);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState('');
 
@@ -129,9 +161,11 @@ function DashboardPage() {
     Promise.all([
       api.get('/admin/dashboard-stats'),
       api.get('/admin/needs-attention'),
+      api.get('/admin/growth-trend'),
     ]).then(function(results) {
       setStats(results[0].data.data);
       setNeedsAttention(results[1].data.data);
+      setGrowthTrend(results[2].data.data);
     }).catch(function() {
       setError('Failed to load dashboard.');
     }).finally(function() {
@@ -192,6 +226,8 @@ function DashboardPage() {
               sub={stats.businesses.expiring_soon + ' plan' + (stats.businesses.expiring_soon === 1 ? '' : 's') + ' expiring soon'}
             />
           </div>
+
+          <GrowthTrendChart data={growthTrend} />
 
           <NeedsAttentionSection data={needsAttention} />
 
