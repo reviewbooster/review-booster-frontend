@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../../components/DashboardLayout';
 import withAuth from '../../../components/withAuth';
 import api from '../../../lib/api';
+import { buildCardData, availableCards, renderCard, CARD_LIBRARY } from '../../../lib/successCards';
 
 var TABS = [
   { key: 'potential',      label: 'Potential' },
@@ -64,6 +65,95 @@ function Field({ label, children }) {
     <div className="mb-4">
       <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1">{label}</p>
       {children}
+    </div>
+  );
+}
+
+function CardsSection({ story }) {
+  const data = buildCardData(story);
+  const cards = availableCards(data);
+  const [activeKey, setActiveKey] = useState(cards[0] ? cards[0].key : null);
+  const [rendering, setRendering] = useState(false);
+  const canvasRef = useState(function() { return { current: null }; })[0];
+
+  useEffect(function() {
+    setActiveKey(cards.length ? cards[0].key : null);
+    // eslint-disable-next-line
+  }, [story._id]);
+
+  useEffect(function() {
+    if (!activeKey || !canvasRef.current) return;
+    setRendering(true);
+    renderCard(canvasRef.current, activeKey, data).finally(function() { setRendering(false); });
+    // eslint-disable-next-line
+  }, [activeKey, story]);
+
+  if (!data.ok) {
+    return (
+      <div className="border-t border-gray-100 pt-4 mt-4">
+        <p className="text-xs text-gray-400">{data.reason || 'Cards are only made from approved stories.'}</p>
+      </div>
+    );
+  }
+  if (cards.length === 0) {
+    return (
+      <div className="border-t border-gray-100 pt-4 mt-4">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Marketing cards</p>
+        <p className="text-xs text-gray-400">The owner hasn't permitted results or a testimonial, so there is nothing to turn into a card.</p>
+      </div>
+    );
+  }
+
+  var groups = {};
+  cards.forEach(function(c) {
+    groups[c.group] = groups[c.group] || [];
+    groups[c.group].push(c);
+  });
+
+  function handleDownload() {
+    var canvas = canvasRef.current;
+    if (!canvas) return;
+    var a = document.createElement('a');
+    a.download = (story.business_id && story.business_id.name ? story.business_id.name.replace(/[^a-z0-9]+/gi, '-') : 'success-story') + '-' + activeKey + '.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }
+
+  return (
+    <div className="border-t border-gray-100 pt-4 mt-4">
+      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Marketing cards</p>
+      <div className="flex flex-wrap gap-2 mb-3">
+        {Object.keys(groups).map(function(group) {
+          return (
+            <div key={group} className="flex items-center gap-1.5">
+              <span className="text-[10px] font-semibold text-gray-400 mr-0.5">{group}:</span>
+              {groups[group].map(function(c) {
+                var active = activeKey === c.key;
+                return (
+                  <button key={c.key} type="button" onClick={function() { setActiveKey(c.key); }}
+                    className={'text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ' +
+                      (active ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300')}>
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-gray-50 rounded-xl p-4 flex flex-col items-center">
+        <div className="w-full max-w-[280px] rounded-lg overflow-hidden shadow-sm bg-white">
+          <canvas ref={function(el) { canvasRef.current = el; }} className="w-full h-auto block" />
+        </div>
+        <button type="button" onClick={handleDownload} disabled={rendering}
+          className="mt-3 text-xs font-semibold px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50">
+          {rendering ? 'Rendering...' : 'Download PNG'}
+        </button>
+      </div>
+      {!data.namePermitted && (
+        <p className="text-[11px] text-gray-400 mt-2">The owner did not permit their business name, so cards show "A ReviewBooster customer".</p>
+      )}
     </div>
   );
 }
@@ -237,6 +327,8 @@ function StoryDetail({ id, onChanged }) {
           </p>
         )}
       </div>
+
+      {story.status === 'approved' && <CardsSection story={story} />}
 
       {story.decision_log && story.decision_log.length > 0 && (
         <div className="mt-4">
