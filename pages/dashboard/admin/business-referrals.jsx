@@ -78,6 +78,21 @@ function BusinessReferralsPage() {
   var pending  = signups.filter(function(s) { return !s.credited; });
   var credited = signups.filter(function(s) { return s.credited; });
 
+  // Top Referrers -- computed from the same signups list already loaded.
+  // There's no click/view tracking on referral links, so every signup
+  // record here already is a conversion; there's no separate "conversion
+  // rate" to show on top of that.
+  var topReferrers = (function() {
+    var counts = {};
+    signups.forEach(function(s) {
+      var key = s.referrer_business_id || s.referrer_name;
+      if (!counts[key]) counts[key] = { name: s.referrer_name, total: 0, credited: 0 };
+      counts[key].total += 1;
+      if (s.credited) counts[key].credited += 1;
+    });
+    return Object.values(counts).sort(function(a, b) { return b.total - a.total; }).slice(0, 5);
+  })();
+
   return (
     <DashboardLayout>
       <div className="max-w-2xl">
@@ -87,6 +102,39 @@ function BusinessReferralsPage() {
         </p>
 
         {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+
+        {!signupsLoading && (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <p className="text-xl font-bold text-gray-900">{signups.length}</p>
+              <p className="text-[11px] text-gray-400 mt-1">Businesses referred</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <p className="text-xl font-bold text-gray-900">{credited.length}</p>
+              <p className="text-[11px] text-gray-400 mt-1">Credited</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <p className="text-xl font-bold text-gray-900">{pending.length}</p>
+              <p className="text-[11px] text-gray-400 mt-1">Pending</p>
+            </div>
+          </div>
+        )}
+
+        {!signupsLoading && topReferrers.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Referrers</h3>
+            <div className="divide-y divide-gray-50">
+              {topReferrers.map(function(r, i) {
+                return (
+                  <div key={i} className="flex items-center justify-between py-2">
+                    <p className="text-sm text-gray-700">{r.name}</p>
+                    <p className="text-xs text-gray-400">{r.total + ' referred \u00b7 ' + r.credited + ' credited'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Reward settings</h3>

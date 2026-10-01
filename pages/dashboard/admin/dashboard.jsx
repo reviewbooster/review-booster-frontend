@@ -72,7 +72,10 @@ function NeedsAttentionSection({ data }) {
   var expiring = data.expiring || [];
   var unresolved = data.unresolved_feedback || [];
   var credits = data.pending_credits || [];
-  var total = expiring.length + unresolved.length + credits.length;
+  var stories = data.pending_stories || [];
+  var stuck = data.stuck_onboarding || [];
+  var support = data.support_waiting || [];
+  var total = expiring.length + unresolved.length + credits.length + stories.length + stuck.length + support.length;
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
@@ -134,6 +137,60 @@ function NeedsAttentionSection({ data }) {
                       <Link href="/dashboard/admin/business-referrals" className="block hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2">
                         <span className="text-xs text-gray-700 truncate block">{c.referrer_name + ' \u2192 ' + c.referred_name}</span>
                         <span className="text-[11px] text-gray-400">{fmtRelative(c.created_at)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {stories.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-2">{'Success stories awaiting review (' + stories.length + ')'}</p>
+              <ul className="space-y-2">
+                {stories.map(function(s) {
+                  return (
+                    <li key={s.story_id}>
+                      <Link href="/dashboard/admin/success-stories" className="flex items-center justify-between gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2">
+                        <span className="text-xs text-gray-700 truncate">{s.business_name}</span>
+                        <span className="text-[11px] font-semibold text-blue-500 shrink-0">{s.status === 'under_review' ? 'In review' : 'New'}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {stuck.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-2">{'Stuck in onboarding (' + stuck.length + ')'}</p>
+              <ul className="space-y-2">
+                {stuck.map(function(b) {
+                  return (
+                    <li key={b.business_id}>
+                      <Link href={'/dashboard/admin/businesses/' + b.business_id} className="flex items-center justify-between gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2">
+                        <span className="text-xs text-gray-700 truncate">{b.business_name}</span>
+                        <span className="text-[11px] font-semibold text-amber-500 shrink-0">{b.days_since_signup + 'd ago'}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {support.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-2">{'Support chats waiting (' + support.length + ')'}</p>
+              <ul className="space-y-2">
+                {support.map(function(c) {
+                  return (
+                    <li key={c.chat_id}>
+                      <Link href="/dashboard/admin/support-chats" className="flex items-center justify-between gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2">
+                        <span className="text-xs text-gray-700 truncate">{c.guest_name}</span>
+                        <span className="text-[11px] font-semibold text-red-500 shrink-0">{fmtRelative(c.last_message_at)}</span>
                       </Link>
                     </li>
                   );

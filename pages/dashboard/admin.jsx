@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import QRCode from "react-qr-code";
 import DashboardLayout from "../../components/DashboardLayout";
 import withAuth from "../../components/withAuth";
@@ -521,6 +521,56 @@ function ActivatePlanModal({ business, onClose, onActivated }) {
   );
 }
 
+var PLAN_BADGE = {
+  free:    "bg-gray-100 text-gray-600",
+  starter: "bg-blue-50 text-blue-600",
+  growth:  "bg-emerald-50 text-emerald-600",
+  pro:     "bg-indigo-50 text-indigo-600",
+  trial:   "bg-amber-50 text-amber-600",
+  basic:   "bg-blue-50 text-blue-600",
+  agency:  "bg-purple-50 text-purple-600",
+};
+function PlanBadge({ plan }) {
+  var cls = PLAN_BADGE[plan] || PLAN_BADGE.free;
+  return <span className={"text-xs font-semibold px-2 py-0.5 rounded-full capitalize " + cls}>{plan}</span>;
+}
+
+function MoreMenu({ business, onEditUrl, onResetPassword, onActivatePlan, onSuspendToggle, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(function() {
+    function onDocClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", onDocClick);
+    return function() { document.removeEventListener("mousedown", onDocClick); };
+  }, []);
+  function item(label, fn, danger) {
+    return (
+      <button type="button" onClick={function() { setOpen(false); fn(); }}
+        className={"w-full text-left px-3 py-2 text-xs rounded-lg transition-colors " + (danger ? "text-red-500 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50")}>
+        {label}
+      </button>
+    );
+  }
+  return (
+    <div className="relative inline-block text-left" ref={ref}>
+      <button type="button" onClick={function() { setOpen(function(o) { return !o; }); }}
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+        {"\u22EF"}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-48 bg-white rounded-xl border border-gray-100 shadow-lg py-1">
+          {item("Edit Google URL", onEditUrl)}
+          {item("Reset Password", onResetPassword)}
+          {item("Activate Plan", onActivatePlan)}
+          {item(business.is_suspended ? "Enable" : "Suspend", onSuspendToggle)}
+          <div className="h-px bg-gray-100 my-1" />
+          {item("Delete Business", onDelete, true)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPage() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -538,10 +588,30 @@ function AdminPage() {
   const [activateTarget,      setActivateTarget]      = useState(null);
 
   const [stats, setStats] = useState(null);
+  const [search, setSearch] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [flagged, setFlagged] = useState({});
 
   useEffect(function() {
     api.get('/admin/dashboard-stats')
       .then(function(res) { setStats(res.data.data); })
+      .catch(function() {});
+  }, []);
+
+  // Reuses the same Needs Attention data already shown on the Overview
+  // dashboard -- a business gets a dot here only if it's a real, already
+  // -verified signal (expiring soon, unresolved feedback, stuck onboarding).
+  useEffect(function() {
+    api.get('/admin/needs-attention')
+      .then(function(res) {
+        var d = res.data.data || {};
+        var map = {};
+        (d.expiring || []).forEach(function(x) { map[x.business_id] = "Plan/trial expiring soon"; });
+        (d.unresolved_feedback || []).forEach(function(x) { map[x.business_id] = "Unresolved feedback piling up"; });
+        (d.stuck_onboarding || []).forEach(function(x) { map[x.business_id] = "Stuck in onboarding"; });
+        setFlagged(map);
+      })
       .catch(function() {});
   }, []);
 
@@ -568,6 +638,17 @@ function AdminPage() {
 
   const handleCreated = (biz) => { setBusinesses(prev => [biz, ...prev]); showToast("Business created!"); };
   const handleDeleted = (id)  => { setBusinesses(prev => prev.filter(b => b._id !== id)); showToast("Business deleted."); };
+
+  var visibleBusinesses = useMemo(function() {
+    var q = search.trim().toLowerCase();
+    return businesses.filter(function(b) {
+      if (q && !(b.name || "").toLowerCase().includes(q) && !(b._id || "").includes(q)) return false;
+      if (planFilter !== "all" && b.plan !== planFilter) return false;
+      if (statusFilter === "active" && b.is_suspended) return false;
+      if (statusFilter === "suspended" && !b.is_suspended) return false;
+      return true;
+    });
+  }, [businesses, search, planFilter, statusFilter]);
 
   if (user?.role !== "super_admin") return null;
 
@@ -661,25 +742,52 @@ function AdminPage() {
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
 
+      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+        <input
+          value={search}
+          onChange={function(e) { setSearch(e.target.value); }}
+          placeholder="Search by name or ID..."
+          className="input flex-1"
+        />
+        <select value={planFilter} onChange={function(e) { setPlanFilter(e.target.value); }} className="input sm:w-40">
+          <option value="all">All plans</option>
+          <option value="free">Free</option>
+          <option value="starter">Starter</option>
+          <option value="growth">Growth</option>
+          <option value="pro">Pro</option>
+        </select>
+        <select value={statusFilter} onChange={function(e) { setStatusFilter(e.target.value); }} className="input sm:w-40">
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+        </select>
+      </div>
+      {!loading && businesses.length > 0 && (
+        <p className="text-xs text-gray-400 -mt-3 mb-4">{visibleBusinesses.length + ' of ' + businesses.length + ' shown'}</p>
+      )}
+
       {/* Mobile card list */}
       <div className="md:hidden space-y-3 mb-5">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-28 bg-white rounded-xl border border-gray-100 animate-pulse" />
           ))
-        ) : businesses.length === 0 ? (
+        ) : visibleBusinesses.length === 0 ? (
           <div className="card">
             <div className="empty-state">
               <p className="empty-icon">{"\uD83C\uDFE2"}</p>
-              <p className="empty-title">No businesses yet</p>
-              <p className="empty-desc">Create the first business account above.</p>
+              <p className="empty-title">{businesses.length === 0 ? "No businesses yet" : "No matches"}</p>
+              <p className="empty-desc">{businesses.length === 0 ? "Create the first business account above." : "Try a different search or filter."}</p>
             </div>
           </div>
-        ) : businesses.map(b => (
+        ) : visibleBusinesses.map(b => (
           <div key={b._id} className={"bg-white rounded-xl border border-gray-100 p-4 " + (b.is_suspended ? "opacity-60" : "")}>
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0 mr-3">
-                <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 truncate hover:text-purple-600 hover:underline block">{b.name}</a>
+                <div className="flex items-center gap-1.5">
+                  {flagged[b._id] && <span title={flagged[b._id]} className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
+                  <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 truncate hover:text-purple-600 hover:underline block">{b.name}</a>
+                </div>
                 <p className="text-xs text-gray-400 font-mono mt-0.5 truncate">{b._id}</p>
               </div>
               {b.is_suspended
@@ -688,44 +796,27 @@ function AdminPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <span className="badge badge-green capitalize">{b.type}</span>
-              <span className="badge badge-blue capitalize">{b.plan}</span>
+              <PlanBadge plan={b.plan} />
               <span className="text-xs text-gray-400">
                 {new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setQrTarget(b)}
-                className="w-full py-2 px-3 text-xs font-semibold rounded-xl text-white transition-opacity hover:opacity-90"
+                className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#7C3AED' }}
               >
                 {'\uD83D\uDCF1'} View QR Code
               </button>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setEditUrlTarget(b)}
-                  className="py-2 px-3 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
-                  Edit URL
-                </button>
-                <button onClick={() => setResetTarget(b)}
-                  className="py-2 px-3 text-xs font-semibold rounded-xl border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors">
-                  Reset PW
-                </button>
-                <button
-                  onClick={() => setSuspendTarget(b)}
-                  className={"py-2 px-3 text-xs font-semibold rounded-xl border transition-colors " +
-                    (b.is_suspended ? "border-green-200 text-green-600 hover:bg-green-50" : "border-orange-200 text-orange-500 hover:bg-orange-50")}
-                >
-                  {b.is_suspended ? "Enable" : "Suspend"}
-                </button>
-                <button onClick={() => setDeleteTarget(b)}
-                  className="py-2 px-3 text-xs font-semibold rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
-                  Delete
-                </button>
-              </div>
-              <button onClick={() => setActivateTarget(b)}
-                className="w-full py-2 px-3 text-xs font-semibold rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors">
-                Activate Plan
-              </button>
+              <MoreMenu
+                business={b}
+                onEditUrl={() => setEditUrlTarget(b)}
+                onResetPassword={() => setResetTarget(b)}
+                onActivatePlan={() => setActivateTarget(b)}
+                onSuspendToggle={() => setSuspendTarget(b)}
+                onDelete={() => setDeleteTarget(b)}
+              />
             </div>
           </div>
         ))}
@@ -746,22 +837,25 @@ function AdminPage() {
                   <td key={j}><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
                 ))}</tr>
               ))
-            ) : businesses.length === 0 ? (
+            ) : visibleBusinesses.length === 0 ? (
               <tr><td colSpan={6}>
                 <div className="empty-state">
                   <p className="empty-icon">{"\uD83C\uDFE2"}</p>
-                  <p className="empty-title">No businesses yet</p>
-                  <p className="empty-desc">Create the first business account above.</p>
+                  <p className="empty-title">{businesses.length === 0 ? "No businesses yet" : "No matches"}</p>
+                  <p className="empty-desc">{businesses.length === 0 ? "Create the first business account above." : "Try a different search or filter."}</p>
                 </div>
               </td></tr>
-            ) : businesses.map(b => (
+            ) : visibleBusinesses.map(b => (
               <tr key={b._id} className={b.is_suspended ? "opacity-60" : ""}>
                 <td>
-                  <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 hover:text-purple-600 hover:underline">{b.name}</a>
+                  <div className="flex items-center gap-1.5">
+                    {flagged[b._id] && <span title={flagged[b._id]} className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
+                    <a href={"/dashboard/admin/businesses/" + b._id} className="font-semibold text-gray-900 hover:text-purple-600 hover:underline">{b.name}</a>
+                  </div>
                   <p className="text-xs text-gray-400 font-mono mt-0.5">{b._id}</p>
                 </td>
                 <td><span className="badge badge-green capitalize">{b.type}</span></td>
-                <td><span className="badge badge-blue capitalize">{b.plan}</span></td>
+                <td><PlanBadge plan={b.plan} /></td>
                 <td>
                   {b.is_suspended
                     ? <span className="badge badge-red">Suspended</span>
@@ -771,7 +865,7 @@ function AdminPage() {
                   {new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </td>
                 <td>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 justify-end">
                     <button
                       onClick={() => setQrTarget(b)}
                       className="py-1.5 px-3 text-xs font-semibold rounded-xl text-white transition-opacity hover:opacity-90"
@@ -779,28 +873,14 @@ function AdminPage() {
                     >
                       QR Code
                     </button>
-                    <button onClick={() => setEditUrlTarget(b)}
-                      className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors duration-150">
-                      Edit URL
-                    </button>
-                    <button onClick={() => setResetTarget(b)}
-                      className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors duration-150">
-                      Reset Password
-                    </button>
-                    <button
-                      onClick={() => setSuspendTarget(b)}
-                      className={"py-1.5 px-3 text-xs font-semibold rounded-xl border transition-colors duration-150 " + (b.is_suspended ? "border-green-200 text-green-600 hover:bg-green-50" : "border-orange-200 text-orange-500 hover:bg-orange-50")}
-                    >
-                      {b.is_suspended ? "Enable" : "Suspend"}
-                    </button>
-                    <button onClick={() => setDeleteTarget(b)}
-                      className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors duration-150">
-                      Delete
-                    </button>
-                    <button onClick={() => setActivateTarget(b)}
-                      className="py-1.5 px-3 text-xs font-semibold rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors duration-150">
-                      Activate Plan
-                    </button>
+                    <MoreMenu
+                      business={b}
+                      onEditUrl={() => setEditUrlTarget(b)}
+                      onResetPassword={() => setResetTarget(b)}
+                      onActivatePlan={() => setActivateTarget(b)}
+                      onSuspendToggle={() => setSuspendTarget(b)}
+                      onDelete={() => setDeleteTarget(b)}
+                    />
                   </div>
                 </td>
               </tr>
@@ -812,4 +892,5 @@ function AdminPage() {
   );
 }
 
+export { ResetPasswordModal, SuspendModal, ViewQrModal, ActivatePlanModal, BILLING_PLAN_SLUGS };
 export default withAuth(AdminPage);

@@ -9,6 +9,7 @@ import { useRouter } from 'next/router';
 import DashboardLayout from '../../../../components/DashboardLayout';
 import withAuth from '../../../../components/withAuth';
 import api from '../../../../lib/api';
+import { ResetPasswordModal, SuspendModal, ViewQrModal, ActivatePlanModal } from '../../admin';
 
 function fmtDate(d) {
   if (!d) return '\u2014';
@@ -41,6 +42,36 @@ function PlanBadge({ plan }) {
   );
 }
 
+// Real signals only -- same 3 the Needs Attention feed uses (expiry
+// proximity, unresolved feedback volume, incomplete onboarding). No fake
+// health score; computed server-side in getBusinessDetail.
+var HEALTH_PILL = {
+  healthy:         { bg: 'bg-green-50', text: 'text-green-700', label: 'Healthy' },
+  needs_attention: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Needs Attention' },
+  at_risk:         { bg: 'bg-red-50',   text: 'text-red-700',   label: 'At Risk' },
+};
+function AccountHealthCard({ health }) {
+  if (!health) return null;
+  var p = HEALTH_PILL[health.status] || HEALTH_PILL.healthy;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Account Health</p>
+        <span className={'text-xs font-semibold px-2.5 py-1 rounded-full ' + p.bg + ' ' + p.text}>{p.label}</span>
+      </div>
+      {health.reasons && health.reasons.length > 0 ? (
+        <ul className="space-y-1">
+          {health.reasons.map(function(r, i) {
+            return <li key={i} className="text-xs text-gray-600">{'\u2022 ' + r}</li>;
+          })}
+        </ul>
+      ) : (
+        <p className="text-xs text-gray-400">No issues detected.</p>
+      )}
+    </div>
+  );
+}
+
 function StatCard({ icon, iconBg, label, value, sub }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -61,14 +92,20 @@ function BusinessDetailPage() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState('');
+  const [qrOpen,       setQrOpen]       = useState(false);
+  const [resetOpen,    setResetOpen]    = useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const [suspendOpen,  setSuspendOpen]  = useState(false);
 
-  useEffect(function() {
+  function loadDetail() {
     if (!id) return;
     api.get('/admin/businesses/' + id + '/detail')
       .then(function(res) { setData(res.data.data); })
       .catch(function() { setError('Failed to load business detail.'); })
       .finally(function() { setLoading(false); });
-  }, [id]);
+  }
+
+  useEffect(function() { loadDetail(); }, [id]);
 
   // Trial model: "on trial" = stored as Free (or the legacy 'trial') with a
   // trial end date still in the future -- not just plan === 'trial'.
@@ -128,6 +165,46 @@ function BusinessDetailPage() {
               )}
             </div>
           </div>
+
+          <AccountHealthCard health={data.health} />
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={function() { setQrOpen(true); }}
+                className="text-xs font-semibold px-4 py-2 rounded-xl text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#7C3AED' }}>
+                View QR
+              </button>
+              <button onClick={function() { setResetOpen(true); }}
+                className="text-xs font-semibold px-4 py-2 rounded-xl border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors">
+                Reset Password
+              </button>
+              <button onClick={function() { setActivateOpen(true); }}
+                className="text-xs font-semibold px-4 py-2 rounded-xl border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors">
+                Change Plan
+              </button>
+              <button onClick={function() { setSuspendOpen(true); }}
+                className={'text-xs font-semibold px-4 py-2 rounded-xl border transition-colors ' +
+                  (data.business.is_suspended ? 'border-green-200 text-green-600 hover:bg-green-50' : 'border-orange-200 text-orange-500 hover:bg-orange-50')}>
+                {data.business.is_suspended ? 'Enable' : 'Suspend'}
+              </button>
+            </div>
+          </div>
+
+          {qrOpen && <ViewQrModal business={data.business} onClose={function() { setQrOpen(false); }} />}
+          {resetOpen && (
+            <ResetPasswordModal business={data.business} onClose={function() { setResetOpen(false); }} onReset={function() {}} />
+          )}
+          {activateOpen && (
+            <ActivatePlanModal business={data.business} onClose={function() { setActivateOpen(false); }}
+              onActivated={function() { setActivateOpen(false); loadDetail(); }} />
+          )}
+          {suspendOpen && (
+            <SuspendModal business={data.business} onClose={function() { setSuspendOpen(false); }}
+              onUpdated={function() { setSuspendOpen(false); loadDetail(); }} />
+          )}
 
           {/* Owner */}
           <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">

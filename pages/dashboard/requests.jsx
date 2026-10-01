@@ -214,4 +214,5 @@ function RequestsPage() {
   );
 }
 
+export { ResetPasswordModal };
 export default withAuth(RequestsPage);

@@ -71,16 +71,20 @@ const ADMIN_NAV_GROUPS = [
   ]},
   { header: "Businesses", items: [
     { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "All Businesses" },
-    { href: "/dashboard/admin/plans", icon: "\uD83D\uDCB3", label: "Plans" },
+  ]},
+  { header: "Revenue", items: [
+    { href: "/dashboard/admin/subscriptions", icon: "\uD83D\uDCB5", label: "Subscriptions" },
+    { href: "/dashboard/admin/plans", icon: "\uD83D\uDCB3", label: "Plans & Pricing" },
     { href: "/dashboard/admin/billing-settings", icon: "\uD83D\uDCB0", label: "Billing Settings" },
   ]},
   { header: "Growth", items: [
     { href: "/dashboard/admin/business-referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
     { href: "/dashboard/admin/success-stories", icon: "\u2B50", label: "Success Stories" },
   ]},
-  { header: "Operations", items: [
-    { href: "/dashboard/requests", icon: "\uD83D\uDD13", label: "Requests" },
-    { href: "/dashboard/admin/support-chats", icon: "\uD83D\uDCAC", label: "Support Chats" },
+  { header: "Inbox", items: [
+    { href: "/dashboard/admin/inbox", icon: "\uD83D\uDCE5", label: "Inbox" },
+  ]},
+  { header: "Security", items: [
     { href: "/dashboard/admin/audit-log", icon: "\uD83D\uDCCB", label: "Audit Log" },
   ]},
   { header: "System", items: [
