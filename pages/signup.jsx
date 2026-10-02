@@ -37,6 +37,26 @@ export default function SignupPage() {
   const [refCode,     setRefCode]     = useState(null);
   const [referrerInfo, setReferrerInfo] = useState(null);
 
+  // TEMPORARY DEBUG -- surfaces any crash or unhandled error directly on
+  // screen as an alert, since mobile has no dev tools. Remove once the
+  // mobile-only signup issue is found.
+  useEffect(function() {
+    function onErr(e) {
+      window.alert('DEBUG window.onerror: ' + (e.message || e) + ' @ ' + (e.filename || '') + ':' + (e.lineno || ''));
+    }
+    function onRejection(e) {
+      var reason = e.reason;
+      var msg = reason && reason.message ? reason.message : JSON.stringify(reason);
+      window.alert('DEBUG unhandledrejection: ' + msg);
+    }
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onRejection);
+    return function() {
+      window.removeEventListener('error', onErr);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
   useEffect(function() {
     if (!router.isReady) return;
     var q = router.query.ref;
