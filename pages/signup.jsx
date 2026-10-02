@@ -1,8 +1,8 @@
-﻿﻿/**
+﻿/**
  * pages/signup.jsx
- * Signup -- Welcome + Account Details only. Creates the account and logs
- * the owner in immediately (no approval wait), then hands off to
- * /onboarding for the rest of the setup wizard.
+ * Signup -- Welcome + Account Details. Creates the account and logs
+ * the owner in immediately (no approval wait, no email verification step),
+ * then hands off to /onboarding for the rest of the setup wizard.
  */
 
 import { useState, useEffect } from 'react';
@@ -15,7 +15,7 @@ export default function SignupPage() {
   const { isAuthenticated, isLoading, login } = useAuth();
   const router = useRouter();
 
-  const [step, setStep] = useState(1); // 1 = Welcome, 2 = Account Details -- Verify Email is now its own page: /signup/verify
+  const [step, setStep] = useState(1); // 1 = Welcome, 2 = Account Details
 
   const [ownerName,       setOwnerName]       = useState('');
   const [email,           setEmail]           = useState('');
@@ -31,26 +31,6 @@ export default function SignupPage() {
   // referred them and what discount applies, before they submit.
   const [refCode,     setRefCode]     = useState(null);
   const [referrerInfo, setReferrerInfo] = useState(null);
-
-  // TEMPORARY DEBUG -- surfaces any crash or unhandled error directly on
-  // screen as an alert, since mobile has no dev tools. Remove once the
-  // mobile-only signup issue is found.
-  useEffect(function() {
-    function onErr(e) {
-      window.alert('DEBUG window.onerror: ' + (e.message || e) + ' @ ' + (e.filename || '') + ':' + (e.lineno || ''));
-    }
-    function onRejection(e) {
-      var reason = e.reason;
-      var msg = reason && reason.message ? reason.message : JSON.stringify(reason);
-      window.alert('DEBUG unhandledrejection: ' + msg);
-    }
-    window.addEventListener('error', onErr);
-    window.addEventListener('unhandledrejection', onRejection);
-    return function() {
-      window.removeEventListener('error', onErr);
-      window.removeEventListener('unhandledrejection', onRejection);
-    };
-  }, []);
 
   useEffect(function() {
     if (!router.isReady) return;
@@ -68,7 +48,7 @@ export default function SignupPage() {
     }
   }, [isLoading, isAuthenticated, router]);
 
-  const handleDetailsSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (password !== confirmPassword) {
@@ -81,19 +61,25 @@ export default function SignupPage() {
     }
     setLoading(true);
     try {
-      await api.post('/auth/signup/request-otp', { email }, { timeout: 30000 });
-      // Carried to /signup/verify via sessionStorage (same-origin, cleared
-      // the moment it's used) -- a route change unmounts this page, so plain
-      // component state can't make the trip.
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('rb_pending_signup', JSON.stringify({
-          owner_name: ownerName, email, phone, password,
-          confirm_password: confirmPassword, ref: refCode || null,
-        }));
-      }
-      router.push('/signup/verify');
+      const payload = {
+        // Business name/type are collected on the next screen (/onboarding);
+        // the backend still requires *something* here, so we send a
+        // placeholder the owner will immediately overwrite there.
+        business_name:    ownerName.trim() + "'s Business",
+        business_type:    'other',
+        business_type_other: 'General',
+        owner_name:       ownerName,
+        email,
+        phone,
+        password,
+        confirm_password: confirmPassword,
+      };
+      if (refCode) payload.ref = refCode;
+      const res = await api.post('/auth/signup', payload);
+      login(res.data);
+      router.replace('/onboarding');
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not send a verification code. Please try again.');
+      setError(err.response?.data?.error || 'Sign up failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -179,7 +165,7 @@ export default function SignupPage() {
                 </div>
               )}
 
-              <form onSubmit={handleDetailsSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Your Name</label>
                   <input
@@ -292,15 +278,14 @@ export default function SignupPage() {
                   {loading ? (
                     <>
                       <span className="spinner w-4 h-4" />
-                      Sending code...
+                      Creating account...
                     </>
-                  ) : 'Continue'}
+                  ) : 'Create Account'}
                 </button>
               </form>
             </div>
           </>
         )}
-
 
         <p className="text-center mt-6">
           <span className="text-gray-300 text-xs">Powered by </span>

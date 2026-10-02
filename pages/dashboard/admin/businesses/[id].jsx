@@ -218,12 +218,32 @@ function BusinessDetailPage() {
                   <p className="text-sm font-semibold text-gray-900">{data.owner.name}</p>
                   <p className="text-xs text-gray-400">{data.owner.email + ' \u00b7 joined ' + fmtDate(data.owner.joined)}</p>
                 </div>
-                <a
-                  href={'mailto:' + data.owner.email + '?subject=' + encodeURIComponent('ReviewBooster \u2014 ' + data.business.name)}
-                  className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors"
-                >
-                  Email Owner
-                </a>
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                  {data.business.phone && (
+                    <>
+                      <a
+                        href={'tel:+91' + data.business.phone}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors text-center"
+                      >
+                        Call
+                      </a>
+                      <a
+                        href={'https://wa.me/91' + data.business.phone}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-green-200 text-green-600 hover:bg-green-50 transition-colors text-center"
+                      >
+                        WhatsApp
+                      </a>
+                    </>
+                  )}
+                  <a
+                    href={'mailto:' + data.owner.email + '?subject=' + encodeURIComponent('ReviewBooster — ' + data.business.name)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors text-center"
+                  >
+                    Email Owner
+                  </a>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-gray-400">No owner account found.</p>
