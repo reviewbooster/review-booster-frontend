@@ -39,6 +39,32 @@ function CountCard({ label, value }) {
   );
 }
 
+function toCsv(rows) {
+  var header = ['Business', 'Status', 'Renewal/Expiry', 'Days Left', 'Signed Up'];
+  var lines = [header.join(',')];
+  rows.forEach(function(r) {
+    var cells = [
+      '"' + (r.business_name || '').replace(/"/g, '""') + '"',
+      r.status,
+      r.renewal_date ? new Date(r.renewal_date).toISOString().slice(0, 10) : '',
+      r.days_left != null ? r.days_left : '',
+      new Date(r.created_at).toISOString().slice(0, 10),
+    ];
+    lines.push(cells.join(','));
+  });
+  return lines.join('\n');
+}
+
+function downloadCsv(filename, csvText) {
+  var blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function SubscriptionsPage() {
   const [rows,    setRows]    = useState([]);
   const [counts,  setCounts]  = useState(null);
@@ -60,9 +86,18 @@ function SubscriptionsPage() {
 
   return (
     <DashboardLayout>
-      <div className="page-header">
-        <h1 className="page-title">Subscriptions</h1>
-        <p className="page-subtitle">Real plan status per business, sorted by soonest renewal.</p>
+      <div className="page-header flex items-start justify-between gap-3">
+        <div>
+          <h1 className="page-title">Subscriptions</h1>
+          <p className="page-subtitle">Real plan status per business, sorted by soonest renewal.</p>
+        </div>
+        {!loading && rows.length > 0 && (
+          <button type="button"
+            onClick={function() { downloadCsv('subscriptions-' + new Date().toISOString().slice(0, 10) + '.csv', toCsv(visible)); }}
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors">
+            {'\u2B07 Export CSV'}
+          </button>
+        )}
       </div>
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}

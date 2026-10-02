@@ -214,10 +214,16 @@ function BusinessDetailPage() {
                 <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-sm shrink-0">
                   {data.owner.name.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{data.owner.name}</p>
                   <p className="text-xs text-gray-400">{data.owner.email + ' \u00b7 joined ' + fmtDate(data.owner.joined)}</p>
                 </div>
+                <a
+                  href={'mailto:' + data.owner.email + '?subject=' + encodeURIComponent('ReviewBooster \u2014 ' + data.business.name)}
+                  className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors"
+                >
+                  Email Owner
+                </a>
               </div>
             ) : (
               <p className="text-xs text-gray-400">No owner account found.</p>

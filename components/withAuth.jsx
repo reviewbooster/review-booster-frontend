@@ -21,10 +21,11 @@ export default function withAuth(WrappedPage, options = {}) {
         return;
       }
 
-      // Super admin belongs only in the admin panel
+      // Super admin belongs only in the admin panel -- lands on the real
+      // Dashboard page, not the bare Businesses list.
       const superAdminPaths = ["/dashboard/admin", "/dashboard/requests"];
       if (user?.role === "super_admin" && !superAdminPaths.some(p => router.pathname.startsWith(p))) {
-        router.replace("/dashboard/admin");
+        router.replace("/dashboard/admin/dashboard");
         return;
       }
 

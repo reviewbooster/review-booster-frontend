@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
+import CommandPalette from "./CommandPalette";
 import ChangePasswordModal from "./ChangePasswordModal";
 import api from "../lib/api";
 import NotificationDropdown from "./NotificationDropdown";
@@ -67,30 +68,50 @@ const ADMIN_NAV = [
 // section headers (Overview / Businesses / Growth / Operations / System).
 const ADMIN_NAV_GROUPS = [
   { header: "Overview", items: [
-    { href: "/dashboard/admin/dashboard", icon: "\uD83D\uDCCA", label: "Dashboard" },
+    { href: "/dashboard/admin/dashboard", label: "Dashboard" },
   ]},
   { header: "Businesses", items: [
-    { href: "/dashboard/admin", icon: "\uD83C\uDFE2", label: "All Businesses" },
+    { href: "/dashboard/admin", label: "All Businesses" },
+    { href: "/dashboard/admin/business-health", label: "Health" },
   ]},
   { header: "Revenue", items: [
-    { href: "/dashboard/admin/subscriptions", icon: "\uD83D\uDCB5", label: "Subscriptions" },
-    { href: "/dashboard/admin/plans", icon: "\uD83D\uDCB3", label: "Plans & Pricing" },
-    { href: "/dashboard/admin/billing-settings", icon: "\uD83D\uDCB0", label: "Billing Settings" },
+    { href: "/dashboard/admin/subscriptions", label: "Subscriptions" },
+    { href: "/dashboard/admin/plans", label: "Plans & Pricing" },
+    { href: "/dashboard/admin/billing-settings", label: "Billing Settings" },
   ]},
   { header: "Growth", items: [
-    { href: "/dashboard/admin/business-referrals", icon: "\uD83C\uDF1F", label: "Business Referrals" },
-    { href: "/dashboard/admin/success-stories", icon: "\u2B50", label: "Success Stories" },
+    { href: "/dashboard/admin/business-referrals", label: "Business Referrals" },
+    { href: "/dashboard/admin/success-stories", label: "Success Stories" },
+    { href: "/dashboard/admin/analytics", label: "Analytics" },
   ]},
   { header: "Inbox", items: [
-    { href: "/dashboard/admin/inbox", icon: "\uD83D\uDCE5", label: "Inbox" },
+    { href: "/dashboard/admin/inbox", label: "Inbox" },
   ]},
   { header: "Security", items: [
-    { href: "/dashboard/admin/audit-log", icon: "\uD83D\uDCCB", label: "Audit Log" },
+    { href: "/dashboard/admin/audit-log", label: "Audit Log" },
   ]},
   { header: "System", items: [
-    { href: "/dashboard/admin/qr-templates", icon: "\uD83C\uDFA8", label: "QR Templates" },
+    { href: "/dashboard/admin/qr-templates", label: "QR Templates" },
+    { href: "/dashboard/admin/tasks", label: "Tasks" },
   ]},
 ];
+
+// Which hub contains the current page -- picks the most specific (longest)
+// matching href, so e.g. a business detail page still opens "Businesses".
+function hubForPath(pathname) {
+  var best = null;
+  var bestLen = -1;
+  ADMIN_NAV_GROUPS.forEach(function(group) {
+    group.items.forEach(function(item) {
+      var matches = pathname === item.href || pathname.indexOf(item.href + "/") === 0;
+      if (matches && item.href.length > bestLen) {
+        bestLen = item.href.length;
+        best = group.header;
+      }
+    });
+  });
+  return best;
+}
 
 function HomeIcon({ active }) {
   var sw = active ? "2.5" : "1.8";
@@ -308,6 +329,19 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
   const { user, logout } = useAuth();
   const { planInfo } = useProductFeatures();
   const [dropdownOpen,       setDropdownOpen]       = useState(false);
+  const [openHubs, setOpenHubs] = useState(function() {
+    var initial = {};
+    var active = hubForPath(router.pathname);
+    if (active) initial[active] = true;
+    return initial;
+  });
+  function toggleHub(header) {
+    setOpenHubs(function(prev) {
+      var next = Object.assign({}, prev);
+      next[header] = !next[header];
+      return next;
+    });
+  }
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [drawerOpen,         setDrawerOpen]         = useState(false);
   const desktopRef = useRef(null);
@@ -453,29 +487,40 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {user?.role === "super_admin" ? (
             ADMIN_NAV_GROUPS.map(function(group) {
+              var isOpen = !!openHubs[group.header];
               return (
-                <div key={group.header} className="mb-3 last:mb-0">
-                  <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.header}</p>
-                  {group.items.map(function({ href, icon, label, count }) {
-                    var active    = isAdminActive(href);
-                    var itemCount = count ? resetRequestCount : 0;
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className={"flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative " +
-                          (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-                      >
-                        <span className="text-base">{icon}</span>
-                        <span>{label}</span>
-                        {itemCount > 0 && (
-                          <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                            {itemCount > 99 ? "99+" : itemCount}
-                          </span>
-                                                )}
-                      </Link>
-                    );
-                  })}
+                <div key={group.header} className="mb-1 last:mb-0">
+                  <button
+                    type="button"
+                    onClick={function() { toggleHub(group.header); }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                  >
+                    <span>{group.header}</span>
+                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"\u203A"}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="mt-0.5 mb-2">
+                      {group.items.map(function({ href, label, count }) {
+                        var active    = isAdminActive(href);
+                        var itemCount = count ? resetRequestCount : 0;
+                        return (
+                          <Link
+                            key={href}
+                            href={href}
+                            className={"flex items-center gap-3 pl-6 pr-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative " +
+                              (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
+                          >
+                            <span>{label}</span>
+                            {itemCount > 0 && (
+                              <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                                {itemCount > 99 ? "99+" : itemCount}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -698,30 +743,41 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {user?.role === "super_admin" ? (
             ADMIN_NAV_GROUPS.map(function(group) {
+              var isOpen = !!openHubs[group.header];
               return (
-                <div key={group.header} className="mb-3 last:mb-0">
-                  <p className="px-3 mb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.header}</p>
-                  {group.items.map(function({ href, icon, label, count }) {
-                    var active    = isAdminActive(href);
-                    var itemCount = count ? resetRequestCount : 0;
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        onClick={function() { setDrawerOpen(false); }}
-                        className={"flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 " +
-                          (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
-                      >
-                        <span className="text-base">{icon}</span>
-                        <span>{label}</span>
-                        {itemCount > 0 && (
-                          <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                            {itemCount > 99 ? "99+" : itemCount}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                <div key={group.header} className="mb-1 last:mb-0">
+                  <button
+                    type="button"
+                    onClick={function() { toggleHub(group.header); }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                  >
+                    <span>{group.header}</span>
+                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"\u203A"}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="mt-0.5 mb-2">
+                      {group.items.map(function({ href, label, count }) {
+                        var active    = isAdminActive(href);
+                        var itemCount = count ? resetRequestCount : 0;
+                        return (
+                          <Link
+                            key={href}
+                            href={href}
+                            onClick={function() { setDrawerOpen(false); }}
+                            className={"flex items-center gap-3 pl-6 pr-3 py-3 rounded-lg text-sm font-medium transition-all duration-150 " +
+                              (active ? "bg-purple-50 text-purple-600" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50")}
+                          >
+                            <span>{label}</span>
+                            {itemCount > 0 && (
+                              <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                                {itemCount > 99 ? "99+" : itemCount}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -752,6 +808,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
         isOpen={changePasswordOpen}
         onClose={() => setChangePasswordOpen(false)}
       />
+      {user?.role === "super_admin" && <CommandPalette />}
     </>
   );
 }

@@ -75,7 +75,8 @@ function NeedsAttentionSection({ data }) {
   var stories = data.pending_stories || [];
   var stuck = data.stuck_onboarding || [];
   var support = data.support_waiting || [];
-  var total = expiring.length + unresolved.length + credits.length + stories.length + stuck.length + support.length;
+  var potential = data.potential_stories_count || 0;
+  var total = expiring.length + unresolved.length + credits.length + stories.length + stuck.length + support.length + (potential > 0 ? 1 : 0);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
@@ -196,6 +197,18 @@ function NeedsAttentionSection({ data }) {
                   );
                 })}
               </ul>
+            </div>
+          )}
+
+          {potential > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-2">Growth detected</p>
+              <Link href="/dashboard/admin/success-stories" className="flex items-center justify-between gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2">
+                <span className="text-xs text-gray-700">
+                  {potential + ' business' + (potential === 1 ? ' has' : 'es have') + ' grown enough to invite for a success story'}
+                </span>
+                <span className="text-[11px] font-semibold text-purple-500 shrink-0">{'\u2192'}</span>
+              </Link>
             </div>
           )}
         </div>
