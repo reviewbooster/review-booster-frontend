@@ -587,17 +587,10 @@ function AdminPage() {
   const [qrTarget,      setQrTarget]      = useState(null);
   const [activateTarget,      setActivateTarget]      = useState(null);
 
-  const [stats, setStats] = useState(null);
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [flagged, setFlagged] = useState({});
-
-  useEffect(function() {
-    api.get('/admin/dashboard-stats')
-      .then(function(res) { setStats(res.data.data); })
-      .catch(function() {});
-  }, []);
 
   // Reuses the same Needs Attention data already shown on the Overview
   // dashboard -- a business gets a dot here only if it's a real, already
@@ -711,34 +704,13 @@ function AdminPage() {
 
       <div className="page-header flex items-center justify-between">
         <div>
-          <h1 className="page-title">Admin Panel</h1>
+          <h1 className="page-title">Businesses</h1>
           <p className="page-subtitle">{businesses.length} business{businesses.length !== 1 ? "es" : ""} registered</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={() => setShowCreate(true)} className="btn-primary">+ Create Business</button>
         </div>
       </div>
-
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <p className="text-xl font-bold text-gray-900">{stats.businesses.total}</p>
-            <p className="text-[11px] text-gray-400 mt-1">{stats.businesses.trial + ' trial \u00b7 ' + stats.businesses.paid + ' paid \u00b7 ' + stats.businesses.suspended + ' suspended'}</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <p className="text-xl font-bold text-gray-900">{stats.customers.total}</p>
-            <p className="text-[11px] text-gray-400 mt-1">Total customers</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <p className="text-xl font-bold text-gray-900">{stats.reviews.avg_rating != null ? stats.reviews.avg_rating + ' \u2605' : '\u2014'}</p>
-            <p className="text-[11px] text-gray-400 mt-1">{stats.reviews.unresolved + ' unresolved feedback'}</p>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-100 p-4">
-            <p className="text-xl font-bold text-gray-900">{stats.businesses.expiring_soon}</p>
-            <p className="text-[11px] text-gray-400 mt-1">{'Expiring soon \u00b7 ' + stats.referrals.pending_business_credits + ' pending credits'}</p>
-          </div>
-        </div>
-      )}
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
 

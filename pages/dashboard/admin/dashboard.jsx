@@ -224,6 +224,7 @@ function DashboardPage() {
   const [growthTrend,    setGrowthTrend]    = useState(null);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState('');
+  const [showDetails,    setShowDetails]    = useState(false);
 
   useEffect(function() {
     setLoading(true);
@@ -245,15 +246,9 @@ function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="page-header flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Admin Panel</h1>
-          <p className="page-subtitle">Platform overview</p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <a href="/dashboard/admin" className="btn-secondary">Businesses</a>
-          <a href="/dashboard/admin/audit-log" className="btn-secondary">Audit Log</a>
-        </div>
+      <div className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-subtitle">Platform overview</p>
       </div>
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
@@ -297,108 +292,121 @@ function DashboardPage() {
             />
           </div>
 
-          <GrowthTrendChart data={growthTrend} />
-
           <NeedsAttentionSection data={needsAttention} />
 
-          {/* Review performance */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Review Performance</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{stats.reviews.avg_rating != null ? stats.reviews.avg_rating + '\u2605' : '\u2014'}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Avg rating</p>
+          <button
+            type="button"
+            onClick={function() { setShowDetails(function(v) { return !v; }); }}
+            className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 py-2.5 mb-6 border border-gray-100 rounded-xl bg-white hover:bg-gray-50 transition-colors"
+          >
+            {showDetails ? 'Hide detail' : 'Show more detail'}
+            <span className={'transition-transform ' + (showDetails ? 'rotate-180' : '')}>{'\u25BE'}</span>
+          </button>
+
+          {showDetails && (
+            <>
+              <GrowthTrendChart data={growthTrend} />
+
+              {/* Review performance */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Review Performance</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{stats.reviews.avg_rating != null ? stats.reviews.avg_rating + '\u2605' : '\u2014'}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Avg rating</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{stats.reviews.public}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Google redirects</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{stats.reviews.conversion_rate != null ? stats.reviews.conversion_rate + '%' : '\u2014'}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Conversion</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{stats.reviews.public}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Google redirects</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{stats.reviews.conversion_rate != null ? stats.reviews.conversion_rate + '%' : '\u2014'}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Conversion</p>
+
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Feedback Health</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{stats.reviews.unresolved}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Open</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{stats.reviews.private - stats.reviews.unresolved}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">Resolved</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">
+                        {stats.reviews.private > 0 ? Math.round(((stats.reviews.private - stats.reviews.unresolved) / stats.reviews.private) * 100) + '%' : '\u2014'}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-1">Resolution rate</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Feedback Health</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{stats.reviews.unresolved}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Open</p>
+              {/* Subscriptions breakdown */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Subscriptions by Plan</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stats.subscriptions.free || 0}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Free</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stats.subscriptions.starter || 0}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Starter</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stats.subscriptions.growth || 0}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Growth</p>
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stats.subscriptions.pro || 0}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Pro</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xl font-bold text-gray-900">{stats.reviews.private - stats.reviews.unresolved}</p>
-                  <p className="text-[11px] text-gray-400 mt-1">Resolved</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-gray-900">
-                    {stats.reviews.private > 0 ? Math.round(((stats.reviews.private - stats.reviews.unresolved) / stats.reviews.private) * 100) + '%' : '\u2014'}
+                {((stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0)) > 0 && (
+                  <p className="text-[11px] text-amber-600 mt-3 pt-3 border-t border-gray-100">
+                    {(stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0) + ' business' + (((stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0)) === 1 ? ' is' : 'es are') + ' still on a retired plan (Basic/Agency) and should be migrated.'}
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-1">Resolution rate</p>
+                )}
+                <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
+                  Revenue isn't shown here yet {'\u2014'} manual UPI billing doesn't record individual payments, so a real revenue number can't be calculated. Subscription counts above reflect actual plan assignments.
+                </p>
+              </div>
+
+              {/* Growth sources — how businesses actually joined */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 mt-6">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">How Businesses Joined</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-purple-50">{'\uD83C\uDF1F'}</div>
+                    <p className="text-xl font-bold text-gray-900">{stats.growth_sources.via_referral}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Via business referral</p>
+                  </div>
+                  <div>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-blue-50">{'\u270D\uFE0F'}</div>
+                    <p className="text-xl font-bold text-gray-900">{stats.growth_sources.self_signup}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Self signup</p>
+                  </div>
+                  <div>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-amber-50">{'\uD83D\uDC64'}</div>
+                    <p className="text-xl font-bold text-gray-900">{stats.growth_sources.admin_created}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">Created by admin</p>
+                  </div>
                 </div>
+                {stats.growth_sources.unknown > 0 && (
+                  <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
+                    {stats.growth_sources.unknown + ' business' + (stats.growth_sources.unknown === 1 ? '' : 'es') + ' from before this was tracked aren\u2019t counted above.'}
+                  </p>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Subscriptions breakdown */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Subscriptions by Plan</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.subscriptions.free || 0}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Free</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.subscriptions.starter || 0}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Starter</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.subscriptions.growth || 0}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Growth</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-gray-900">{stats.subscriptions.pro || 0}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Pro</p>
-              </div>
-            </div>
-            {((stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0)) > 0 && (
-              <p className="text-[11px] text-amber-600 mt-3 pt-3 border-t border-gray-100">
-                {(stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0) + ' business' + (((stats.subscriptions.basic || 0) + (stats.subscriptions.agency || 0)) === 1 ? ' is' : 'es are') + ' still on a retired plan (Basic/Agency) and should be migrated.'}
-              </p>
-            )}
-            <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
-              Revenue isn't shown here yet {'\u2014'} manual UPI billing doesn't record individual payments, so a real revenue number can't be calculated. Subscription counts above reflect actual plan assignments.
-            </p>
-          </div>
-
-          {/* Growth sources — how businesses actually joined */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 mt-6">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">How Businesses Joined</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-purple-50">{'\uD83C\uDF1F'}</div>
-                <p className="text-xl font-bold text-gray-900">{stats.growth_sources.via_referral}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Via business referral</p>
-              </div>
-              <div>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-blue-50">{'\u270D\uFE0F'}</div>
-                <p className="text-xl font-bold text-gray-900">{stats.growth_sources.self_signup}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Self signup</p>
-              </div>
-              <div>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2 text-base bg-amber-50">{'\uD83D\uDC64'}</div>
-                <p className="text-xl font-bold text-gray-900">{stats.growth_sources.admin_created}</p>
-                <p className="text-[11px] text-gray-400 mt-1">Created by admin</p>
-              </div>
-            </div>
-            {stats.growth_sources.unknown > 0 && (
-              <p className="text-[11px] text-gray-400 mt-3 pt-3 border-t border-gray-100">
-                {stats.growth_sources.unknown + ' business' + (stats.growth_sources.unknown === 1 ? '' : 'es') + ' from before this was tracked aren\u2019t counted above.'}
-              </p>
-            )}
-          </div>
+            </>
+          )}
         </>
       ) : null}
     </DashboardLayout>

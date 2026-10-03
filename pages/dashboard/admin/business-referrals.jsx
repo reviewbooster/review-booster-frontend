@@ -15,10 +15,79 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function RewardSettingsModal({ initialSettings, onClose, onSaved }) {
+  const [settings, setSettings] = useState(initialSettings);
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState('');
+
+  function set(key, value) {
+    setSettings(function(s) { return Object.assign({}, s, { [key]: value }); });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError('');
+    try {
+      await api.patch('/admin/business-referral-settings', settings);
+      onSaved(settings);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to save settings.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-900">Reward Settings</h2>
+            <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">X</button>
+          </div>
+          {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          <div className="space-y-3">
+            <div>
+              <label className="label">Reward text shown to the referring business</label>
+              <textarea className="input" rows={2} value={settings.referrer_reward_text}
+                onChange={function(e) { set('referrer_reward_text', e.target.value); }} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Reward type</label>
+                <select className="input" value={settings.referrer_reward_type}
+                  onChange={function(e) { set('referrer_reward_type', e.target.value); }}>
+                  <option value="discount_pct">% off next renewal</option>
+                  <option value="free_days">Free days</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Reward value</label>
+                <input className="input" type="number" min="0" value={settings.referrer_reward_value}
+                  onChange={function(e) { set('referrer_reward_value', Number(e.target.value)); }} />
+              </div>
+            </div>
+            <div>
+              <label className="label">{"New business's one-time signup discount (%)"}</label>
+              <input className="input" type="number" min="0" max="100" value={settings.referred_discount_pct}
+                onChange={function(e) { set('referred_discount_pct', Number(e.target.value)); }} />
+              <p className="text-xs text-gray-400 mt-1">{"Auto-shown on their first plan's payment screen. Payment itself is still manual."}</p>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <button onClick={onClose} disabled={saving} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 justify-center">
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BusinessReferralsPage() {
   const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
   const [error,   setError]   = useState('');
   const [settings, setSettings] = useState({
     referrer_reward_type: 'discount_pct',
@@ -29,6 +98,7 @@ function BusinessReferralsPage() {
   const [signups,        setSignups]        = useState([]);
   const [signupsLoading, setSignupsLoading] = useState(true);
   const [creditingId,    setCreditingId]    = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   useEffect(function() {
     api.get('/admin/business-referral-settings')
@@ -41,25 +111,6 @@ function BusinessReferralsPage() {
       .catch(function() {})
       .finally(function() { setSignupsLoading(false); });
   }, []);
-
-  function set(key, value) {
-    setSaved(false);
-    setSettings(function(s) { return Object.assign({}, s, { [key]: value }); });
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setError('');
-    try {
-      await api.patch('/admin/business-referral-settings', settings);
-      setSaved(true);
-      setTimeout(function() { setSaved(false); }, 3000);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save settings.');
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleMarkCredited(id) {
     setCreditingId(id);
@@ -96,10 +147,31 @@ function BusinessReferralsPage() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Business Referrals</h1>
-        <p className="text-xs text-gray-400 mb-5">
+        {showSettingsModal && (
+          <RewardSettingsModal
+            initialSettings={settings}
+            onClose={function() { setShowSettingsModal(false); }}
+            onSaved={function(saved) {
+              setSettings(saved);
+              setShowSettingsModal(false);
+            }}
+          />
+        )}
+
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <h1 className="text-xl font-bold text-gray-900">Business Referrals</h1>
+          <button onClick={function() { setShowSettingsModal(true); }}
+            className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-purple-300 transition-colors">
+            Reward Settings
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mb-1">
           Businesses that refer other businesses to ReviewBooster (Engine B): what they earn, and the referrals waiting to be credited.
         </p>
+        {!loading && settings.referrer_reward_text && (
+          <p className="text-xs text-gray-400 mb-5">{settings.referrer_reward_text}</p>
+        )}
+        {loading && <div className="mb-5" />}
 
         {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
@@ -120,66 +192,7 @@ function BusinessReferralsPage() {
           </div>
         )}
 
-        {!signupsLoading && topReferrers.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Referrers</h3>
-            <div className="divide-y divide-gray-50">
-              {topReferrers.map(function(r, i) {
-                return (
-                  <div key={i} className="flex items-center justify-between py-2">
-                    <p className="text-sm text-gray-700">{r.name}</p>
-                    <p className="text-xs text-gray-400">{r.total + ' referred \u00b7 ' + r.credited + ' credited'}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Reward settings</h3>
-          {loading ? (
-            <div className="h-24 bg-gray-50 rounded-xl animate-pulse" />
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <label className="label">Reward text shown to the referring business</label>
-                <textarea className="input" rows={2} value={settings.referrer_reward_text}
-                  onChange={function(e) { set('referrer_reward_text', e.target.value); }} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Reward type</label>
-                  <select className="input" value={settings.referrer_reward_type}
-                    onChange={function(e) { set('referrer_reward_type', e.target.value); }}>
-                    <option value="discount_pct">% off next renewal</option>
-                    <option value="free_days">Free days</option>
-                    <option value="none">None</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Reward value</label>
-                  <input className="input" type="number" min="0" value={settings.referrer_reward_value}
-                    onChange={function(e) { set('referrer_reward_value', Number(e.target.value)); }} />
-                </div>
-              </div>
-              <div>
-                <label className="label">{"New business's one-time signup discount (%)"}</label>
-                <input className="input" type="number" min="0" max="100" value={settings.referred_discount_pct}
-                  onChange={function(e) { set('referred_discount_pct', Number(e.target.value)); }} />
-                <p className="text-xs text-gray-400 mt-1">{"Auto-shown on their first plan's payment screen. Payment itself is still manual."}</p>
-              </div>
-              <div className="flex items-center gap-3 pt-1">
-                <button onClick={handleSave} disabled={saving} className="btn-primary">
-                  {saving ? 'Saving...' : 'Save Settings'}
-                </button>
-                {saved && <span className="text-sm text-green-600 font-medium">{'\u2713 Saved'}</span>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">
             {'Pending credits' + (pending.length > 0 ? ' (' + pending.length + ')' : '')}
           </h3>
@@ -224,6 +237,22 @@ function BusinessReferralsPage() {
             </div>
           )}
         </div>
+
+        {!signupsLoading && topReferrers.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Top Referrers</h3>
+            <div className="divide-y divide-gray-50">
+              {topReferrers.map(function(r, i) {
+                return (
+                  <div key={i} className="flex items-center justify-between py-2">
+                    <p className="text-sm text-gray-700">{r.name}</p>
+                    <p className="text-xs text-gray-400">{r.total + ' referred \u00b7 ' + r.credited + ' credited'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

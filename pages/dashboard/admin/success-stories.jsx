@@ -14,11 +14,11 @@ import api from '../../../lib/api';
 import { buildCardData, availableCards, renderCard, CARD_LIBRARY } from '../../../lib/successCards';
 
 var TABS = [
-  { key: 'potential',      label: 'Potential' },
+  { key: 'potential',      label: 'Potential',      primary: true },
+  { key: 'submitted',      label: 'Submitted',      primary: true },
+  { key: 'changes_needed', label: 'Changes needed', primary: true },
   { key: 'invited',        label: 'Invited' },
-  { key: 'submitted',      label: 'Submitted' },
   { key: 'under_review',   label: 'Under review' },
-  { key: 'changes_needed', label: 'Changes needed' },
   { key: 'approved',       label: 'Approved' },
   { key: 'rejected',       label: 'Rejected' },
   { key: 'withdrawn',      label: 'Withdrawn' },
@@ -360,6 +360,7 @@ function SuccessStoriesPage() {
   const [error,   setError]   = useState('');
   const [openId,  setOpenId]  = useState(null);
   const [inviting, setInviting] = useState(null);
+  const [showAllTabs, setShowAllTabs] = useState(false);
 
   var load = useCallback(function() {
     setError('');
@@ -406,8 +407,8 @@ function SuccessStoriesPage() {
 
         {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {TABS.map(function(t) {
+        <div className="flex flex-wrap gap-2 mb-2">
+          {TABS.filter(function(t) { return t.primary; }).map(function(t) {
             var active = tab === t.key;
             return (
               <button key={t.key} type="button"
@@ -419,6 +420,34 @@ function SuccessStoriesPage() {
             );
           })}
         </div>
+
+        {(function() {
+          var secondaryTabs = TABS.filter(function(t) { return !t.primary; });
+          var secondaryActive = secondaryTabs.some(function(t) { return t.key === tab; });
+          if (!showAllTabs && !secondaryActive) {
+            return (
+              <button type="button" onClick={function() { setShowAllTabs(true); }}
+                className="text-xs font-semibold text-gray-400 hover:text-gray-600 mb-4 inline-flex items-center gap-1">
+                More stages {'\u25BE'}
+              </button>
+            );
+          }
+          return (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {secondaryTabs.map(function(t) {
+                var active = tab === t.key;
+                return (
+                  <button key={t.key} type="button"
+                    onClick={function() { setTab(t.key); setOpenId(null); }}
+                    className={'text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ' +
+                      (active ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300')}>
+                    {t.label + ' (' + countFor(t.key) + ')'}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {loading ? (
           <div className="h-24 bg-white rounded-2xl border border-gray-100 animate-pulse" />

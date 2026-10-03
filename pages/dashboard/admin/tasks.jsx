@@ -28,6 +28,7 @@ function TasksPage() {
   const [title,   setTitle]   = useState('');
   const [priority, setPriority] = useState('medium');
   const [adding,  setAdding]  = useState(false);
+  const [showPriority, setShowPriority] = useState(false);
 
   const load = useCallback(function() {
     setLoading(true);
@@ -50,6 +51,7 @@ function TasksPage() {
       await api.post('/admin/tasks', { title: title.trim(), priority: priority });
       setTitle('');
       setPriority('medium');
+      setShowPriority(false);
       await load();
     } catch (err) {
       setError(err.response?.data?.error || 'Could not add task.');
@@ -87,22 +89,45 @@ function TasksPage() {
 
       {error && <div className="alert-error mb-5"><span>!</span><span>{error}</span></div>}
 
-      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-2 mb-5">
-        <input
-          value={title}
-          onChange={function(e) { setTitle(e.target.value); }}
-          placeholder="Add a task..."
-          className="input flex-1"
-        />
-        <select value={priority} onChange={function(e) { setPriority(e.target.value); }} className="input sm:w-32">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-        <button type="submit" disabled={adding || !title.trim()} className="btn-primary disabled:opacity-50">
-          {adding ? 'Adding...' : 'Add'}
-        </button>
+      <form onSubmit={handleAdd} className="mb-2">
+        <div className="flex items-center gap-2">
+          <input
+            value={title}
+            onChange={function(e) { setTitle(e.target.value); }}
+            placeholder="Add a task..."
+            className="input flex-1 min-w-0"
+          />
+          <button type="submit" disabled={adding || !title.trim()} className="btn-primary shrink-0 px-4 disabled:opacity-50">
+            {adding ? '...' : 'Add'}
+          </button>
+        </div>
       </form>
+
+      <div className="mb-5">
+        {showPriority ? (
+          <div className="flex items-center gap-1.5">
+            {['low', 'medium', 'high'].map(function(p) {
+              var selected = priority === p;
+              return (
+                <button key={p} type="button" onClick={function() { setPriority(p); setShowPriority(false); }}
+                  className={'text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize transition-colors ' +
+                    (selected ? PRIORITY_PILL[p] : 'bg-white text-gray-400 border border-gray-200 hover:border-gray-300')}>
+                  {p}
+                </button>
+              );
+            })}
+            <button type="button" onClick={function() { setShowPriority(false); }} aria-label="Close"
+              className="text-gray-300 hover:text-gray-500 transition-colors px-1">
+              {'\u2715'}
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={function() { setShowPriority(true); }}
+            className={'text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize inline-flex items-center gap-1 ' + (PRIORITY_PILL[priority] || PRIORITY_PILL.medium)}>
+            {priority} priority {'\u25BE'}
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-2 mb-5">
         {['open', 'completed'].map(function(t) {
@@ -140,7 +165,7 @@ function TasksPage() {
                   className="w-4 h-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className={'text-sm ' + (t.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900')}>{t.title}</p>
-                  <p className="text-[11px] text-gray-400">
+                  <p className="text-[11px] text-gray-400 truncate">
                     {fmtDate(t.created_at) + (t.related_business_name ? ' \u00b7 ' + t.related_business_name : '')}
                   </p>
                 </div>

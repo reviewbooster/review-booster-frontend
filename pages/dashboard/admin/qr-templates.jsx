@@ -62,6 +62,104 @@ function EditTemplateModal({ template, onClose, onUpdated }) {
   );
 }
 
+function UploadTemplateModal({ onClose, onUploaded }) {
+  const [title,       setTitle]       = useState('');
+  const [description, setDescription] = useState('');
+  const [file,        setFile]        = useState(null);
+  const [preview,     setPreview]     = useState(null);
+  const [uploading,   setUploading]   = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  function handleFileChange(e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    setFile(f);
+    var reader = new FileReader();
+    reader.onload = function(ev) { setPreview(ev.target.result); };
+    reader.readAsDataURL(f);
+  }
+
+  async function handleUpload() {
+    setUploadError('');
+    if (!title.trim()) { setUploadError('Title is required.'); return; }
+    if (!file)         { setUploadError('Please select an image.'); return; }
+    setUploading(true);
+    try {
+      var fd = new FormData();
+      fd.append('title',       title.trim());
+      fd.append('description', description.trim());
+      fd.append('image',       file);
+      var res = await api.post('/qr-templates', fd);
+      onUploaded(res.data.data);
+    } catch (e) {
+      setUploadError(e.response?.data?.error || 'Upload failed.');
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-gray-900">Upload New Template</h2>
+            <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">X</button>
+          </div>
+          {uploadError && (
+            <div className="alert-error mb-4"><span>!</span><span>{uploadError}</span></div>
+          )}
+          <div className="mb-3">
+            <label className="label">Template Title *</label>
+            <input
+              className="input"
+              placeholder="e.g. Diwali Special"
+              value={title}
+              onChange={function(e) { setTitle(e.target.value); }}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="label">Description (optional)</label>
+            <input
+              className="input"
+              placeholder="e.g. Festive template for seasonal campaigns"
+              value={description}
+              onChange={function(e) { setDescription(e.target.value); }}
+            />
+          </div>
+          <div className="mb-4">
+            <label className="label">Image (JPEG / PNG / WebP, max 2 MB) *</label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="flex-1 px-3 py-2 rounded-xl border border-dashed border-gray-200 hover:border-purple-400 transition-colors text-sm text-gray-400 truncate">
+                {file ? file.name : 'No file selected'}
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <span className="shrink-0 px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-sm font-semibold hover:bg-purple-100 transition-colors">
+                Browse
+              </span>
+            </label>
+          </div>
+          {preview && (
+            <div className="mb-4 flex justify-center bg-gray-50 rounded-xl border border-gray-100 p-3">
+              <img src={preview} alt="Preview" className="max-h-40 max-w-full rounded-lg object-contain" />
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={uploading} className="btn-secondary flex-1 justify-center">Cancel</button>
+            <button onClick={handleUpload} disabled={uploading} className="btn-primary flex-1 justify-center">
+              {uploading ? 'Uploading...' : 'Upload Template'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function QrTemplatesPage() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -73,14 +171,9 @@ function QrTemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
 
-  const [title,        setTitle]        = useState('');
-  const [description,  setDescription]  = useState('');
-  const [file,         setFile]         = useState(null);
-  const [preview,      setPreview]      = useState(null);
-  const [uploading,    setUploading]    = useState(false);
-  const [uploadError,  setUploadError]  = useState('');
-  const [searchQuery,  setSearchQuery]  = useState('');
-  const [editTarget,   setEditTarget]   = useState(null);
+  const [searchQuery,     setSearchQuery]     = useState('');
+  const [editTarget,      setEditTarget]      = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const filteredTemplates = templates.filter(function(t) {
     var q = searchQuery.trim().toLowerCase();
@@ -111,39 +204,6 @@ function QrTemplatesPage() {
   }
 
   useEffect(function() { load(); }, []);
-
-  function handleFileChange(e) {
-    var f = e.target.files[0];
-    if (!f) return;
-    setFile(f);
-    var reader = new FileReader();
-    reader.onload = function(ev) { setPreview(ev.target.result); };
-    reader.readAsDataURL(f);
-  }
-
-  async function handleUpload() {
-    setUploadError('');
-    if (!title.trim()) { setUploadError('Title is required.'); return; }
-    if (!file)         { setUploadError('Please select an image.'); return; }
-    setUploading(true);
-    try {
-      var fd = new FormData();
-      fd.append('title',       title.trim());
-      fd.append('description', description.trim());
-      fd.append('image',       file);
-      var res = await api.post('/qr-templates', fd);
-      setTemplates(function(prev) { return [res.data.data, ...prev]; });
-      setTitle('');
-      setDescription('');
-      setFile(null);
-      setPreview(null);
-      showToast('Template uploaded!');
-    } catch (e) {
-      setUploadError(e.response?.data?.error || 'Upload failed.');
-    } finally {
-      setUploading(false);
-    }
-  }
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -177,6 +237,17 @@ function QrTemplatesPage() {
               setTemplates(function(prev) { return prev.map(function(t) { return t._id === updated._id ? updated : t; }); });
               setEditTarget(null);
               showToast('Template updated!');
+            }}
+          />
+        )}
+
+        {showUploadModal && (
+          <UploadTemplateModal
+            onClose={function() { setShowUploadModal(false); }}
+            onUploaded={function(uploaded) {
+              setTemplates(function(prev) { return [uploaded, ...prev]; });
+              setShowUploadModal(false);
+              showToast('Template uploaded!');
             }}
           />
         )}
@@ -218,72 +289,12 @@ function QrTemplatesPage() {
           </div>
         )}
 
-        <div className="page-header">
-          <h1 className="page-title">QR Templates</h1>
-          <p className="page-subtitle">Upload custom background templates for business QR codes</p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
-          <h2 className="text-sm font-bold text-gray-900 mb-4">Upload New Template</h2>
-          {uploadError && (
-            <div className="alert-error mb-4"><span>!</span><span>{uploadError}</span></div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <div className="mb-3">
-                <label className="label">Template Title *</label>
-                <input
-                  className="input"
-                  placeholder="e.g. Diwali Special"
-                  value={title}
-                  onChange={function(e) { setTitle(e.target.value); }}
-                />
-              </div>
-              <div className="mb-3">
-                <label className="label">Description (optional)</label>
-                <input
-                  className="input"
-                  placeholder="e.g. Festive template for seasonal campaigns"
-                  value={description}
-                  onChange={function(e) { setDescription(e.target.value); }}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="label">Image (JPEG / PNG / WebP, max 2 MB) *</label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <div className="flex-1 px-3 py-2 rounded-xl border border-dashed border-gray-200 hover:border-purple-400 transition-colors text-sm text-gray-400 truncate">
-                    {file ? file.name : 'No file selected'}
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                  <span className="shrink-0 px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-sm font-semibold hover:bg-purple-100 transition-colors">
-                    Browse
-                  </span>
-                </label>
-              </div>
-              <button
-                onClick={handleUpload}
-                disabled={uploading}
-                className="btn-primary w-full justify-center"
-              >
-                {uploading ? 'Uploading...' : 'Upload Template'}
-              </button>
-            </div>
-            <div className="flex flex-col items-center justify-center bg-gray-50 rounded-xl border border-gray-100 min-h-[180px] p-4">
-              {preview ? (
-                <img src={preview} alt="Preview" className="max-h-48 max-w-full rounded-lg object-contain" />
-              ) : (
-                <div className="text-center">
-                  <div className="text-4xl mb-2">{'\uD83D\uDCF8'}</div>
-                  <p className="text-xs text-gray-400">Image preview will appear here</p>
-                </div>
-              )}
-            </div>
+        <div className="page-header flex items-center justify-between">
+          <div>
+            <h1 className="page-title">QR Templates</h1>
+            <p className="page-subtitle">Custom background templates for business QR codes</p>
           </div>
+          <button onClick={function() { setShowUploadModal(true); }} className="btn-primary shrink-0">+ Add Template</button>
         </div>
 
         {error && <div className="alert-error mb-4"><span>!</span><span>{error}</span></div>}

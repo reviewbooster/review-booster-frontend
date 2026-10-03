@@ -80,7 +80,7 @@ function AuditLogPage() {
               <div key={e._id} className="flex items-start justify-between px-5 py-3.5 border-b border-gray-100 last:border-0">
                 <div className="min-w-0 flex-1 mr-3">
                   <p className="text-sm font-semibold text-gray-900">{ACTION_LABEL(e.action)}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-400 mt-0.5 truncate">
                     {e.actor_name || 'Unknown'}{e.actor_role ? ' (' + e.actor_role + ')' : ''}
                     {e.target_label ? ' \u2192 ' + e.target_label : ''}
                   </p>
@@ -93,9 +93,9 @@ function AuditLogPage() {
       </div>
 
       {total > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-400">{'Showing ' + ((page - 1) * LIMIT + 1) + '\u2013' + Math.min(page * LIMIT, total) + ' of ' + total}</p>
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400 truncate min-w-0">{'Showing ' + ((page - 1) * LIMIT + 1) + '\u2013' + Math.min(page * LIMIT, total) + ' of ' + total}</p>
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={function() { setPage(function(p) { return Math.max(1, p - 1); }); }} disabled={page === 1}
               className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Prev</button>
             <button onClick={function() { setPage(function(p) { return Math.min(totalPages, p + 1); }); }} disabled={page === totalPages}

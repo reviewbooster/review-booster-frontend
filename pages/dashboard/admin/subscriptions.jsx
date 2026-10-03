@@ -136,7 +136,49 @@ function SubscriptionsPage() {
         })}
       </div>
 
-      <div className="table-wrapper">
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          Array.from({ length: 4 }).map(function(_, i) {
+            return <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />;
+          })
+        ) : visible.length === 0 ? (
+          <div className="card">
+            <div className="empty-state">
+              <p className="empty-icon">{'\uD83D\uDCB3'}</p>
+              <p className="empty-title">No matches</p>
+              <p className="empty-desc">Try a different filter.</p>
+            </div>
+          </div>
+        ) : visible.map(function(r) {
+          var urgent = r.days_left !== null && r.days_left <= 3 && r.days_left >= 0;
+          var expired = r.days_left !== null && r.days_left < 0;
+          return (
+            <div key={r.business_id} className="bg-white rounded-xl border border-gray-100 p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <Link href={'/dashboard/admin/businesses/' + r.business_id} className="font-semibold text-gray-900 truncate hover:text-purple-600 hover:underline">
+                  {r.business_name}
+                </Link>
+                <span className="shrink-0"><StatusPill status={r.status} /></span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-700">
+                  {fmtDate(r.renewal_date)}
+                  {r.days_left !== null && (
+                    <span className={'ml-1.5 font-semibold ' + (expired ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-gray-400')}>
+                      {expired ? 'Expired' : r.days_left + 'd left'}
+                    </span>
+                  )}
+                </span>
+                <span className="text-gray-400 shrink-0">{'Signed ' + fmtDate(r.created_at)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block table-wrapper">
         <table className="table">
           <thead>
             <tr><th>Business</th><th>Status</th><th>Renewal / Expiry</th><th>Signed up</th></tr>
