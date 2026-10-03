@@ -11,6 +11,20 @@ import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
 import SEO from '../components/SEO';
 
+function getPasswordStrength(pw) {
+  if (!pw) return { score: 0, label: '', color: '', bar: '' };
+  if (pw.length < 8) return { score: 0, label: 'Too short \u2014 min. 8 characters', color: 'text-red-500', bar: 'bg-red-400' };
+  var points = 1; // meets the 8-character minimum
+  if (pw.length >= 12) points++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) points++;
+  if (/\d/.test(pw)) points++;
+  if (/[^A-Za-z0-9]/.test(pw)) points++;
+  if (points <= 1) return { score: 1, label: 'Weak', color: 'text-red-500', bar: 'bg-red-400' };
+  if (points === 2) return { score: 2, label: 'Fair', color: 'text-amber-500', bar: 'bg-amber-400' };
+  if (points === 3) return { score: 3, label: 'Good', color: 'text-blue-500', bar: 'bg-blue-400' };
+  return { score: 4, label: 'Strong', color: 'text-green-600', bar: 'bg-green-500' };
+}
+
 export default function SignupPage() {
   const { isAuthenticated, isLoading, login } = useAuth();
   const router = useRouter();
@@ -51,6 +65,10 @@ export default function SignupPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -238,6 +256,19 @@ export default function SignupPage() {
                       )}
                     </button>
                   </div>
+                  {password.length > 0 && (function() {
+                    var s = getPasswordStrength(password);
+                    return (
+                      <div className="mt-1.5">
+                        <div className="flex gap-1 mb-1">
+                          {[1, 2, 3, 4].map(function(i) {
+                            return <div key={i} className={'h-1 flex-1 rounded-full transition-colors ' + (i <= s.score ? s.bar : 'bg-gray-100')} />;
+                          })}
+                        </div>
+                        <p className={'text-[11px] font-medium ' + s.color}>{s.label}</p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
