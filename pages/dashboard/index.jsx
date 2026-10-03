@@ -367,11 +367,6 @@ function DashboardPage() {
     }
   };
 
-  var handleExploreMyself = function() {
-    markIntroSeen();
-    setProductIntroSeen(true);
-  };
-
   return (
     <DashboardLayout showBack={false}>
       {productIntroSeen === false && (
@@ -413,22 +408,13 @@ function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={handleShowMeAround}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-colors"
-              >
-                {'Show me around \u2192'}
-              </button>
-              <button
-                type="button"
-                onClick={handleExploreMyself}
-                className="text-gray-400 hover:text-gray-600 font-semibold text-sm transition-colors shrink-0"
-              >
-                I'll explore myself
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleShowMeAround}
+              className="w-full px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-colors"
+            >
+              {'Show me around \u2192'}
+            </button>
           </div>
         </div>
       )}

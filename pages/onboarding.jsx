@@ -312,22 +312,67 @@ export default function OnboardingPage() {
                 )}
 
                 <div className="pt-3 mt-1 border-t border-white/10">
-                  <p className="text-white/70 text-sm font-semibold">Optional: your Google numbers today</p>
-                  <p className="text-white/35 text-xs mt-0.5 mb-3">So you can see how much you grow. You'll find both on your Google Business Profile.</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="number" inputMode="numeric" min="0" value={gCount}
-                      onChange={(e) => setGCount(e.target.value)}
-                      placeholder="Reviews, e.g. 182"
-                      className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
-                    />
-                    <input
-                      type="number" inputMode="decimal" step="0.1" min="1" max="5" value={gRating}
-                      onChange={(e) => setGRating(e.target.value)}
-                      placeholder="Rating, e.g. 4.3"
-                      className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
-                    />
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0 text-base">{'\uD83D\uDCCD'}</span>
+                    <div>
+                      <p className="text-white font-semibold text-sm">Set your starting point</p>
+                      <p className="text-white/40 text-xs mt-0.5">Before ReviewBooster starts tracking your growth, we need your current Google numbers.</p>
+                    </div>
                   </div>
+
+                  <div className="bg-white/5 rounded-xl p-3.5 mb-4">
+                    <p className="text-white/70 text-xs font-semibold mb-2">Where do I find these?</p>
+                    <ol className="space-y-1.5 mb-3">
+                      <li className="flex items-start gap-2 text-xs text-white/50">
+                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        Open Google Maps or Google Search.
+                      </li>
+                      <li className="flex items-start gap-2 text-xs text-white/50">
+                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        Search for your business name.
+                      </li>
+                      <li className="flex items-start gap-2 text-xs text-white/50">
+                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                        <span>On your business profile, you'll see your rating (e.g. 4.3) and total reviews (e.g. 182).</span>
+                      </li>
+                    </ol>
+                    <div className="bg-white rounded-lg p-3 max-w-[220px] mx-auto shadow-sm">
+                      <p className="text-[10px] font-bold text-gray-500 mb-1">Google</p>
+                      <p className="text-xs font-semibold text-gray-900">Your Business</p>
+                      <p className="text-[11px] text-gray-600 mb-2">{'4.3 \u2605\u2605\u2605\u2605\u2606 (182)'}</p>
+                      <div className="flex gap-1.5">
+                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Call</span>
+                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Directions</span>
+                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Share</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-white/70 text-xs font-semibold mb-2">Enter your current Google numbers below:</p>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label className="block text-[11px] text-white/40 mb-1">Total Google reviews</label>
+                      <input
+                        type="number" inputMode="numeric" min="0" value={gCount}
+                        onChange={(e) => setGCount(e.target.value)}
+                        placeholder="e.g. 182"
+                        className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-white/40 mb-1">Google rating</label>
+                      <input
+                        type="number" inputMode="decimal" step="0.1" min="1" max="5" value={gRating}
+                        onChange={(e) => setGRating(e.target.value)}
+                        placeholder="e.g. 4.3 / 5"
+                        className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-white/35 text-[11px] flex items-start gap-1.5 mt-1">
+                    <span className="shrink-0">{'\u2139'}</span>
+                    <span>These numbers are your starting point. We'll use them to show how your reviews and rating grow over time.</span>
+                  </p>
                 </div>
 
                 <button
