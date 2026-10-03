@@ -1,6 +1,9 @@
 ﻿/**
  * pages/onboarding.jsx
- * Post-signup setup wizard -- Business Details -> Google Link -> Complete.
+ * Post-signup setup wizard -- Business Details -> Google Link -> Starting
+ * Point (Google numbers) -> Complete. Link and starting-point numbers are
+ * both mandatory -- no skip, since the "Your results" comparison later
+ * needs a real baseline.
  * Reached right after signup, and as a forced redirect for anyone whose
  * business still has onboarding_completed: false.
  */
@@ -26,13 +29,13 @@ const BUSINESS_TYPES = [
   { value: 'other',       label: 'Other' },
 ];
 
-const STEPS = ['business', 'google', 'complete'];
-const STEP_NUMBERS = { business: 2, google: 3 }; // 'Step X of 4' -- 1 is Account Details on /signup
+const STEPS = ['business', 'google', 'starting_point', 'complete'];
+const STEP_NUMBERS = { business: 2, google: 3, starting_point: 4 }; // 'Step X of 5' -- 1 is Account Details on /signup
 
 function StepDots({ current }) {
   return (
     <div className="flex items-center justify-center gap-1.5 mb-1">
-      {[1, 2, 3, 4].map(function(n) {
+      {[1, 2, 3, 4, 5].map(function(n) {
         return (
           <span
             key={n}
@@ -134,31 +137,49 @@ export default function OnboardingPage() {
   const handleGoogleNext = async (e) => {
     e.preventDefault();
     var trimmed = googleUrl.trim();
-    if (trimmed && !trimmed.startsWith('https://')) {
+    if (!trimmed) {
+      setError('Please paste your Google review link to continue.');
+      return;
+    }
+    if (!trimmed.startsWith('https://')) {
       setError('This must be a secure link starting with https://');
       return;
     }
-    // Optional: the owner's current Google numbers, saved as their starting
-    // point for the "Your results" comparison later.
+    goNext({ google_review_url: trimmed });
+  };
+
+  // The owner's current Google numbers, saved as their starting point for
+  // the "Your results" comparison later. Its own step now, and mandatory --
+  // a 0-review business can still continue without a rating, since Google
+  // itself has no rating to show until there's at least one review.
+  const handleStartingPointNext = async (e) => {
+    e.preventDefault();
     var countText = gCount.trim();
-    var baseline = null;
-    if (countText !== '') {
-      if (!/^\d+$/.test(countText)) {
-        setError('Enter your Google review count as a whole number, e.g. 182.');
-        return;
-      }
-      var countNum = parseInt(countText, 10);
-      var ratingNum = Number(gRating);
-      if (countNum > 0 && !(ratingNum >= 1 && ratingNum <= 5)) {
-        setError('Enter your Google rating between 1 and 5, e.g. 4.3.');
-        return;
-      }
-      baseline = { kind: 'baseline', review_count: countNum, rating: countNum > 0 ? ratingNum : null };
+    if (!countText) {
+      setError('Please enter your current Google review count to continue.');
+      return;
     }
-    if (baseline) {
-      try { await api.put('/business/my-google-numbers', baseline); } catch (err) { /* optional -- never block setup on it */ }
+    if (!/^\d+$/.test(countText)) {
+      setError('Enter your Google review count as a whole number, e.g. 182.');
+      return;
     }
-    goNext(trimmed ? { google_review_url: trimmed } : null);
+    var countNum = parseInt(countText, 10);
+    var ratingNum = Number(gRating);
+    if (countNum > 0 && !(ratingNum >= 1 && ratingNum <= 5)) {
+      setError('Enter your Google rating between 1 and 5, e.g. 4.3.');
+      return;
+    }
+    setError('');
+    setSaving(true);
+    try {
+      await api.put('/business/my-google-numbers', { kind: 'baseline', review_count: countNum, rating: countNum > 0 ? ratingNum : null });
+      var idx = STEPS.indexOf(step);
+      setStep(STEPS[idx + 1]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleComplete = async () => {
@@ -290,6 +311,7 @@ export default function OnboardingPage() {
               <form onSubmit={handleGoogleNext} className="space-y-3">
                 <input
                   type="url"
+                  required
                   value={googleUrl}
                   onChange={(e) => setGoogleUrl(e.target.value)}
                   placeholder="https://g.page/r/..."
@@ -311,49 +333,77 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
-                <div className="pt-3 mt-1 border-t border-white/10">
-                  <div className="flex items-start gap-3 mb-3">
-                    <span className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0 text-base">{'\uD83D\uDCCD'}</span>
-                    <div>
-                      <p className="text-white font-semibold text-sm">Set your starting point</p>
-                      <p className="text-white/40 text-xs mt-0.5">Before ReviewBooster starts tracking your growth, we need your current Google numbers.</p>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 mt-2"
+                >
+                  {saving ? 'Saving...' : 'Next'}
+                </button>
+              </form>
+            </>
+          )}
+
+          {step === 'starting_point' && (
+            <>
+              <button
+                type="button"
+                onClick={goBack}
+                className="text-white/30 hover:text-white/60 text-sm mb-4 -ml-1 transition-colors"
+                aria-label="Back"
+              >
+                {'\u2190'}
+              </button>
+
+              <div className="flex items-start gap-3 mb-5">
+                <span className="w-10 h-10 rounded-full bg-purple-600/10 flex items-center justify-center shrink-0">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="1.8">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-7.58-7-12a7 7 0 1114 0c0 4.42-7 12-7 12z" />
+                    <circle cx="12" cy="9" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <div>
+                  <h1 className="text-white text-lg font-bold">Set your starting point</h1>
+                  <p className="text-white/40 text-sm mt-0.5">Before ReviewBooster starts tracking your growth, we need your current Google numbers.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleStartingPointNext} className="space-y-4">
+                <div className="bg-white/5 rounded-xl p-3.5">
+                  <p className="text-white/70 text-xs font-semibold mb-2">Where do I find these?</p>
+                  <ol className="space-y-1.5 mb-3">
+                    <li className="flex items-start gap-2 text-xs text-white/50">
+                      <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                      Open Google Maps or Google Search.
+                    </li>
+                    <li className="flex items-start gap-2 text-xs text-white/50">
+                      <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                      Search for your business name.
+                    </li>
+                    <li className="flex items-start gap-2 text-xs text-white/50">
+                      <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                      <span>On your business profile, you'll see your rating (e.g. 4.3) and total reviews (e.g. 182).</span>
+                    </li>
+                  </ol>
+                  <div className="bg-white rounded-lg p-3 max-w-[220px] mx-auto shadow-sm">
+                    <p className="text-[10px] font-bold text-gray-500 mb-1">Google</p>
+                    <p className="text-xs font-semibold text-gray-900">Your Business</p>
+                    <p className="text-[11px] text-gray-600 mb-2">{'4.3 \u2605\u2605\u2605\u2605\u2606 (182)'}</p>
+                    <div className="flex gap-1.5">
+                      <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Call</span>
+                      <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Directions</span>
+                      <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Share</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="bg-white/5 rounded-xl p-3.5 mb-4">
-                    <p className="text-white/70 text-xs font-semibold mb-2">Where do I find these?</p>
-                    <ol className="space-y-1.5 mb-3">
-                      <li className="flex items-start gap-2 text-xs text-white/50">
-                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                        Open Google Maps or Google Search.
-                      </li>
-                      <li className="flex items-start gap-2 text-xs text-white/50">
-                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                        Search for your business name.
-                      </li>
-                      <li className="flex items-start gap-2 text-xs text-white/50">
-                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                        <span>On your business profile, you'll see your rating (e.g. 4.3) and total reviews (e.g. 182).</span>
-                      </li>
-                    </ol>
-                    <div className="bg-white rounded-lg p-3 max-w-[220px] mx-auto shadow-sm">
-                      <p className="text-[10px] font-bold text-gray-500 mb-1">Google</p>
-                      <p className="text-xs font-semibold text-gray-900">Your Business</p>
-                      <p className="text-[11px] text-gray-600 mb-2">{'4.3 \u2605\u2605\u2605\u2605\u2606 (182)'}</p>
-                      <div className="flex gap-1.5">
-                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Call</span>
-                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Directions</span>
-                        <span className="text-[9px] px-2 py-1 rounded bg-gray-100 text-gray-500">Share</span>
-                      </div>
-                    </div>
-                  </div>
-
+                <div>
                   <p className="text-white/70 text-xs font-semibold mb-2">Enter your current Google numbers below:</p>
-                  <div className="grid grid-cols-2 gap-3 mb-2">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] text-white/40 mb-1">Total Google reviews</label>
                       <input
-                        type="number" inputMode="numeric" min="0" value={gCount}
+                        type="number" inputMode="numeric" min="0" required value={gCount}
                         onChange={(e) => setGCount(e.target.value)}
                         placeholder="e.g. 182"
                         className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600/50 focus:border-purple-600/50 transition-colors duration-150"
@@ -369,7 +419,7 @@ export default function OnboardingPage() {
                       />
                     </div>
                   </div>
-                  <p className="text-white/35 text-[11px] flex items-start gap-1.5 mt-1">
+                  <p className="text-white/35 text-[11px] flex items-start gap-1.5 mt-2">
                     <span className="shrink-0">{'\u2139'}</span>
                     <span>These numbers are your starting point. We'll use them to show how your reviews and rating grow over time.</span>
                   </p>
@@ -381,14 +431,6 @@ export default function OnboardingPage() {
                   className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 mt-2"
                 >
                   {saving ? 'Saving...' : 'Next'}
-                </button>
-                <button
-                  type="button"
-                  onClick={function() { goNext(null); }}
-                  disabled={saving}
-                  className="w-full py-2 text-white/30 hover:text-white/60 text-sm font-medium transition-colors"
-                >
-                  Skip for now
                 </button>
               </form>
             </>
