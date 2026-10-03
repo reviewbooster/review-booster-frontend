@@ -22,6 +22,13 @@ const PERIOD_OPTIONS = [
   { days: 90, label: 'Last 3 months' },
 ];
 
+const CHANNEL_LABELS = {
+  qr:       'QR Code',
+  whatsapp: 'WhatsApp',
+  sms:      'SMS',
+  email:    'Email',
+};
+
 function getDateRangeLabel(days) {
   const end   = new Date();
   const start = new Date();
@@ -94,6 +101,8 @@ function DashboardPage() {
   const [mounted,       setMounted]       = useState(false);
   const [error,         setError]         = useState('');
   const [chartLocked,   setChartLocked]   = useState(null);
+  const [themeSummary,  setThemeSummary]  = useState(null);
+  const [exporting,     setExporting]     = useState(false);
   const dropdownRef  = useRef(null);
   const firstLoadRef = useRef(true);
 
@@ -163,6 +172,18 @@ function DashboardPage() {
     load();
   }, [selectedDays, dateMode, rangeStart, rangeEnd]);
 
+  // Top Feedback Topics -- /reviews/theme-summary only supports ?days=N (no
+  // custom start/end range yet), so a custom range uses its equivalent
+  // day-count as the closest honest approximation.
+  useEffect(() => {
+    const effDays = dateMode === 'range' && rangeStart && rangeEnd
+      ? Math.max(1, Math.round((new Date(rangeEnd) - new Date(rangeStart)) / 86400000) + 1)
+      : selectedDays;
+    api.get('/reviews/theme-summary?days=' + effDays)
+      .then((res) => setThemeSummary(res.data.data))
+      .catch(() => {});
+  }, [selectedDays, dateMode, rangeStart, rangeEnd]);
+
   if (loading) return <DashboardSkeleton />;
 
   const handleCustomDaysApply = () => {
@@ -187,6 +208,30 @@ function DashboardPage() {
     setRangeError('');
     setDateMode('range');
     setDropdownOpen(false);
+  };
+
+  const handleExportPdf = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const query = dateMode === 'range' && rangeStart && rangeEnd
+        ? 'start_date=' + rangeStart + '&end_date=' + rangeEnd
+        : 'days=' + selectedDays;
+      const res = await api.get('/analytics/export?' + query, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'analytics-report-' + new Date().toISOString().slice(0, 10) + '.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to export report.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const today = new Date().toISOString().slice(0, 10);
@@ -217,6 +262,47 @@ function DashboardPage() {
     { icon: '\u26A0', isGoogle: false, label: 'Unresolved', value: totalUnresolved, pct: calcFeedbackPct(totalUnresolved), color: '#F87171' },
   ];
 
+  // Insights -- real period-over-period deltas only. Each one is skipped
+  // silently (not shown as "no change") when there's nothing to report.
+  const insights = [];
+  if (summary) {
+    const volDiff = (summary.this_month?.total_reviews ?? 0) - (summary.last_month?.total_reviews ?? 0);
+    if (volDiff !== 0) {
+      insights.push({
+        key: 'volume',
+        icon: volDiff > 0 ? '\uD83D\uDCC8' : '\uD83D\uDCC9',
+        text: volDiff > 0
+          ? volDiff + ' more review' + (volDiff === 1 ? '' : 's') + ' than the previous period.'
+          : Math.abs(volDiff) + ' fewer review' + (Math.abs(volDiff) === 1 ? '' : 's') + ' than the previous period.',
+      });
+    }
+
+    const prevReq  = summary.prev_total_requests ?? 0;
+    const prevConv = prevReq > 0 ? (summary.last_month?.total_reviews ?? 0) / prevReq : null;
+    if (prevConv !== null && summary.conversion_rate != null) {
+      const curPct  = Math.round(summary.conversion_rate * 100);
+      const prevPct = Math.round(prevConv * 100);
+      if (curPct !== prevPct) {
+        insights.push({
+          key: 'conversion',
+          icon: curPct > prevPct ? '\uD83D\uDCC8' : '\uD83D\uDCC9',
+          text: 'Conversion moved from ' + prevPct + '% to ' + curPct + '%.',
+        });
+      }
+    }
+
+    const negDiff = (summary.this_month?.total_private ?? 0) - (summary.last_month?.total_private ?? 0);
+    if (negDiff !== 0) {
+      insights.push({
+        key: 'feedback',
+        icon: negDiff > 0 ? '\u26A0\uFE0F' : '\u2705',
+        text: negDiff > 0
+          ? 'Private feedback increased by ' + negDiff + ' vs the previous period.'
+          : 'Private feedback decreased by ' + Math.abs(negDiff) + ' vs the previous period.',
+      });
+    }
+  }
+
   return (
     <DashboardLayout>
       {error && (
@@ -230,6 +316,7 @@ function DashboardPage() {
       <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900 leading-tight mb-3">Analytics</h1>
 
+        <div className="flex items-center gap-2 flex-wrap">
         {/* Period dropdown */}
         <div className="relative inline-block" ref={dropdownRef}>
           <button
@@ -317,6 +404,15 @@ function DashboardPage() {
             </div>
           )}
         </div>
+
+        <button
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-[11px] font-medium text-gray-500 shadow-sm hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50"
+        >
+          {exporting ? 'Exporting...' : '\u2B07\uFE0F\u00a0Export Report'}
+        </button>
+        </div>
       </div>
 
       <div className={fetching ? 'opacity-50 pointer-events-none transition-opacity duration-150' : 'transition-opacity duration-150'}>
@@ -351,17 +447,35 @@ function DashboardPage() {
           </div>
         </div>
 
+        {/* Insights -- real period-over-period observations only */}
+        {insights.length > 0 && (
+          <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-4 mb-4">
+            <h2 className="text-[10px] font-bold text-purple-700 uppercase tracking-wide mb-2">Insights</h2>
+            <div className="space-y-1.5">
+              {insights.map((i) => (
+                <p key={i.key} className="text-[12px] text-gray-700 flex items-start gap-1.5">
+                  <span className="shrink-0">{i.icon}</span>
+                  <span>{i.text}</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Funnel + Chart */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Review Funnel */}
           <div id="tour-analytics-funnel" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="text-[13px] font-bold text-gray-800">Review Funnel</h2>
               <Link href="/dashboard/reviews" className="text-[11px] font-semibold text-purple-600 hover:underline">
                 View all
               </Link>
             </div>
+            <p className="text-[11px] text-gray-400 mb-3 min-h-[14px]">
+              {summary?.avg_days_to_review != null && ('Avg. ' + summary.avg_days_to_review + ' day' + (summary.avg_days_to_review === 1 ? '' : 's') + ' to review')}
+            </p>
             <div className="space-y-3.5">
               {funnelRows.map((row) => (
                 <FunnelRow
@@ -453,6 +567,100 @@ function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Rating Breakdown + Channel Performance */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+          {/* Rating Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <h2 className="text-[13px] font-bold text-gray-800 mb-4">Rating Breakdown</h2>
+            {(summary?.rating_breakdown || []).every((r) => r.count === 0) ? (
+              <p className="text-[12px] text-gray-400 py-2">Not enough data yet.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {(summary?.rating_breakdown || []).map((r) => (
+                  <div key={r.rating} className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 shrink-0 w-7 tabular-nums">{r.rating + '\u2605'}</span>
+                    <div className="flex-1 rounded-full overflow-hidden" style={{ height: '5px', backgroundColor: '#F3F4F6' }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: r.pct + '%', backgroundColor: '#FBBF24' }}
+                      />
+                    </div>
+                    <span className="text-[11px] font-bold text-gray-700 tabular-nums shrink-0" style={{ width: '26px', textAlign: 'right' }}>{r.count}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums shrink-0" style={{ width: '32px', textAlign: 'right' }}>{r.pct + '%'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Channel Performance */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <h2 className="text-[13px] font-bold text-gray-800 mb-4">Channel Performance</h2>
+            {(summary?.by_channel_table || []).length === 0 ? (
+              <p className="text-[12px] text-gray-400 py-2">Not enough data yet.</p>
+            ) : (
+              <div>
+                <div className="grid grid-cols-4 gap-2 text-[9px] font-semibold text-gray-400 uppercase tracking-wide pb-2 mb-1 border-b border-gray-50">
+                  <span>Channel</span>
+                  <span className="text-right">Requests</span>
+                  <span className="text-right">Reviews</span>
+                  <span className="text-right">Conv.</span>
+                </div>
+                {summary.by_channel_table.map((row) => (
+                  <div key={row.channel} className="grid grid-cols-4 gap-2 text-[12px] text-gray-700 py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="font-medium truncate">{CHANNEL_LABELS[row.channel] || row.channel}</span>
+                    <span className="text-right tabular-nums">{row.sent}</span>
+                    <span className="text-right tabular-nums">{row.reviews}</span>
+                    <span className="text-right tabular-nums font-semibold">{Math.round(row.conversion_rate * 100) + '%'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Top Feedback Topics -- real counts of which structured categories
+            come up most, split by positive (public) vs negative (private)
+            feedback. Not an AI-generated summary of free text. */}
+        {themeSummary && (themeSummary.positive.length > 0 || themeSummary.negative.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <h2 className="text-[13px] font-bold text-gray-800 mb-1">Top Positive Themes</h2>
+              <p className="text-[11px] text-gray-400 mb-3">What's working, from 4-5\u2605 reviews</p>
+              {themeSummary.positive.length === 0 ? (
+                <p className="text-[12px] text-gray-400 py-2">Not enough data yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {themeSummary.positive.map((t) => (
+                    <div key={t.label} className="flex items-center justify-between">
+                      <span className="text-[12px] text-gray-700 truncate">{t.label}</span>
+                      <span className="text-[11px] font-bold text-gray-500 tabular-nums shrink-0 ml-2">{t.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <h2 className="text-[13px] font-bold text-gray-800 mb-1">Top Issues</h2>
+              <p className="text-[11px] text-gray-400 mb-3">What's not, from private feedback</p>
+              {themeSummary.negative.length === 0 ? (
+                <p className="text-[12px] text-gray-400 py-2">Not enough data yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {themeSummary.negative.map((t) => (
+                    <div key={t.label} className="flex items-center justify-between">
+                      <span className="text-[12px] text-gray-700 truncate">{t.label}</span>
+                      <span className="text-[11px] font-bold text-gray-500 tabular-nums shrink-0 ml-2">{t.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

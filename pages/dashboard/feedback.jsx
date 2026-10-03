@@ -700,6 +700,8 @@ function FeedbackPage() {
   const [tagOptions,  setTagOptions]  = useState([]);
   const [resolving,   setResolving]   = useState(null);
   const [viewItem,    setViewItem]    = useState(null);
+  const [exportLoading,  setExportLoading]  = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [themeSummary,      setThemeSummary]      = useState(null);
   const [themeSummaryOpen,  setThemeSummaryOpen]  = useState(false);
 
@@ -761,6 +763,22 @@ function FeedbackPage() {
     }
     return params;
   }, [filter, search, dateMode, selectedDays, rangeStart, rangeEnd]);
+
+  var handleExport = async function(format) {
+    setExportLoading(true);
+    try {
+      var params = buildFilterParams();
+      params.set('format', format);
+      var res = await api.get('/reviews/private/export?' + params.toString(), { responseType: 'blob' });
+      var url = URL.createObjectURL(res.data);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'private-feedback-export.' + format;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+    setExportLoading(false);
+  };
 
   const load = useCallback(async function() {
     if (firstLoadRef.current) {
@@ -1195,6 +1213,37 @@ function FeedbackPage() {
             {'\u2715'}
           </button>
         )}
+
+        <div className="relative shrink-0">
+          <button
+            onClick={function() { setExportMenuOpen(function(v) { return !v; }); }}
+            disabled={exportLoading}
+            title="Export"
+            className="flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 text-gray-500 hover:border-purple-300 hover:text-purple-600 transition-colors disabled:opacity-50">
+            {exportLoading ? '\u2026' : (
+              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+            )}
+          </button>
+          {exportMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={function() { setExportMenuOpen(false); }} />
+              <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-20">
+                <button
+                  onClick={function() { setExportMenuOpen(false); handleExport('csv'); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  CSV
+                </button>
+                <button
+                  onClick={function() { setExportMenuOpen(false); handleExport('pdf'); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  PDF
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
