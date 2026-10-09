@@ -1,4 +1,4 @@
-﻿/**
+/**
  * pages/r/[token].jsx
  * Customer-facing review page.
  * PUBLIC -- no auth required.
@@ -10,6 +10,7 @@ import Head from 'next/head';
 import StarRating from '../../components/StarRating';
 import api from '../../lib/api';
 import { getExperienceChips, generateReviewDraft, getIssueGroups, findIssue } from '../../lib/reviewDraftPrompts';
+import { LANGUAGES, UI_STRINGS } from '../../lib/uiStrings';
 import { isStandalonePWA } from '../../lib/waLink';
 
 function openGoogleReview(url) {
@@ -56,7 +57,7 @@ function BackButton({ onClick }) {
   );
 }
 
-function BusinessHeader({ business }) {
+function BusinessHeader({ business, subtitle }) {
   return (
     <div
       className="pt-12 pb-16 flex flex-col items-center px-5"
@@ -77,7 +78,7 @@ function BusinessHeader({ business }) {
       </div>
       <h1 className="text-white font-bold text-xl mb-1 text-center animate-fade-in" style={{ animationDelay: '150ms' }}>{business.name}</h1>
       <p className="text-center animate-fade-in" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px', animationDelay: '250ms' }}>
-        Your feedback helps us improve
+        {subtitle}
       </p>
     </div>
   );
@@ -97,6 +98,10 @@ export default function PublicReviewPage() {
   const [idSubmitting, setIdSubmitting] = useState(false);
   const [idError,      setIdError]      = useState('');
 
+  // -- language selection, shown before anything else ----------------------
+  const [lang,          setLang]         = useState(null);
+  const [langSelected,  setLangSelected] = useState(false);
+
   // -- 4-5 star (public) flow --------------------------------------------
   const [draftScreen,    setDraftScreen]    = useState(false);
   const [selectedChips,  setSelectedChips]  = useState([]);
@@ -112,6 +117,11 @@ export default function PublicReviewPage() {
   const [issueFollowUpAnswers, setIssueFollowUpAnswers] = useState({});
   const [feedbackText,        setFeedbackText]        = useState('');
   const [requestFollowUp,     setRequestFollowUp]     = useState(false);
+
+  var t = function (key) {
+    var dict = (lang && UI_STRINGS[lang]) || UI_STRINGS.en;
+    return dict[key] !== undefined ? dict[key] : UI_STRINGS.en[key];
+  };
 
   useEffect(function () {
     if (!token) return;
@@ -139,7 +149,7 @@ export default function PublicReviewPage() {
   var handleIdentifySubmit = async function (e) {
     e.preventDefault();
     if (!idName.trim()) {
-      setIdError('Please enter your name.');
+      setIdError(t('nameRequiredError'));
       return;
     }
     setIdSubmitting(true);
@@ -150,7 +160,7 @@ export default function PublicReviewPage() {
       await api.post('/r/' + token + '/identify', { name: idName.trim(), phone: fullPhone });
       setScreen(SCREEN.RATE);
     } catch (err) {
-      setIdError(err.response?.data?.error || 'Something went wrong. You can still continue below.');
+      setIdError(err.response?.data?.error || t('genericIdError'));
     } finally {
       setIdSubmitting(false);
     }
@@ -160,19 +170,19 @@ export default function PublicReviewPage() {
     setScreen(SCREEN.RATE);
   };
 
-  // Tapping a star commits to a path immediately -- both ranges skip the
-  // extra "Continue" tap and go straight into their respective screen.
+  // Tapping a star only selects it now -- it stays on the star screen so the
+  // customer can change their mind. Only "Continue" commits to a path.
   var handleRatingSelect = function (r) {
-    var isDifferentRating = r !== rating;
     setRating(r);
-    if (r >= 1 && r <= 3) {
-      if (isDifferentRating) {
-        setSelectedIssueKeys([]);
-        setIssueFollowUpAnswers({});
-        setFeedbackText('');
-      }
+  };
+
+  var handleRatingContinue = function () {
+    if (rating >= 1 && rating <= 3) {
+      setSelectedIssueKeys([]);
+      setIssueFollowUpAnswers({});
+      setFeedbackText('');
       setIssueScreen('A');
-    } else if (r >= 4) {
+    } else if (rating >= 4) {
       setDraftScreen(true);
     }
   };
@@ -195,6 +205,7 @@ export default function PublicReviewPage() {
       businessType: business.type,
       selectedChipKeys: chips,
       customerWords: '',
+      lang: lang,
     });
     setDraftText(draft);
   };
@@ -234,12 +245,6 @@ export default function PublicReviewPage() {
   // focus. Falls back to the older execCommand technique for contexts where
   // the modern Clipboard API isn't available at all.
   var copyTextToClipboard = function (text) {
-    // execCommand is old and deprecated, but it's NOT gated behind the
-    // Permissions API at all -- it works by directly selecting text in a
-    // hidden textarea, so it never triggers the "allow clipboard access?"
-    // system prompt that navigator.clipboard.writeText sometimes shows on
-    // Android/embedded browsers. Try it first; fall back to the modern API
-    // only if execCommand genuinely isn't supported.
     var legacyCopy = function () {
       return new Promise(function (resolve, reject) {
         var textarea = document.createElement('textarea');
@@ -271,18 +276,13 @@ export default function PublicReviewPage() {
 
   var handleCopyDraft = function () {
     setUsedDraft(true);
-    // Copy FIRST, while the document still has focus -- window.open() right
-    // after this shifts focus to the new tab, and the Clipboard API silently
-    // fails if focus has already moved by the time it's called.
     if (draftText) {
       copyTextToClipboard(draftText).then(function () { setDraftCopied(true); }).catch(function () {});
     }
-    // Still synchronous and immediate, so mobile browsers still treat this
-    // as a direct response to the user's tap rather than a blocked popup.
     if (business.google_review_url) {
       openGoogleReview(business.google_review_url);
     }
-    var chipLabels = getExperienceChips(business.type)
+    var chipLabels = getExperienceChips(business.type, lang)
       .filter(function (c) { return selectedChips.indexOf(c.key) !== -1; })
       .map(function (c) { return c.label; });
     submitReview(rating, draftText, chipLabels);
@@ -293,7 +293,7 @@ export default function PublicReviewPage() {
     if (business.google_review_url) {
       openGoogleReview(business.google_review_url);
     }
-    var chipLabels = getExperienceChips(business.type)
+    var chipLabels = getExperienceChips(business.type, lang)
       .filter(function (c) { return selectedChips.indexOf(c.key) !== -1; })
       .map(function (c) { return c.label; });
     submitReview(rating, '', chipLabels);
@@ -313,7 +313,7 @@ export default function PublicReviewPage() {
   };
 
   var getSelectedIssues = function () {
-    return selectedIssueKeys.map(function (key) { return findIssue(business.type, key); }).filter(Boolean);
+    return selectedIssueKeys.map(function (key) { return findIssue(business.type, key, lang); }).filter(Boolean);
   };
 
   var buildFinalFeedbackText = function (issues) {
@@ -358,19 +358,54 @@ export default function PublicReviewPage() {
     }
   };
 
-  var headerTitle = 'How was your experience?';
-  var headerSubtitle = 'Please rate your experience with us';
+  var headerTitle = t('rateHeaderTitle');
+  var headerSubtitle = t('rateHeaderSubtitle');
   if (draftScreen) {
-    headerTitle = 'What stood out about your visit?';
-    headerSubtitle = 'Pick what applies \u2014 totally optional';
+    headerTitle = t('draftHeaderTitle');
+    headerSubtitle = t('draftHeaderSubtitle');
   } else if (issueScreen === 'A') {
-    headerTitle = 'What could we improve?';
-    headerSubtitle = 'Choose the issue that best matches your experience.';
+    headerTitle = t('issueHeaderTitleA');
+    headerSubtitle = t('issueHeaderSubtitleA');
   } else if (issueScreen === 'B') {
-    headerTitle = 'Tell us a little more';
+    headerTitle = t('issueHeaderTitleB');
     headerSubtitle = selectedIssueKeys.length > 0
-      ? ('You selected: ' + selectedIssueKeys.map(function (k) { var i = findIssue(business ? business.type : null, k); return i ? i.label : ''; }).filter(Boolean).join(', '))
+      ? (t('youSelected') + selectedIssueKeys.map(function (k) { var i = findIssue(business ? business.type : null, k, lang); return i ? i.label : ''; }).filter(Boolean).join(', '))
       : '';
+  }
+
+  // -- language gate: shown before everything else, regardless of load state
+  if (!langSelected) {
+    return (
+      <>
+        <Head>
+          <title>ReviewBooster</title>
+          <meta name="robots" content="noindex, nofollow" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+        </Head>
+        <div
+          className="min-h-screen flex items-center justify-center px-5"
+          style={{ background: 'linear-gradient(135deg,#7C3AED 0%,#4F46E5 100%)' }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center">
+            <h1 className="text-lg font-bold text-gray-900 mb-6">{t('langTitle')}</h1>
+            <div className="flex flex-col gap-3">
+              {LANGUAGES.map(function (l) {
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={function () { setLang(l.code); setLangSelected(true); }}
+                    className="w-full py-3 rounded-xl border border-gray-200 text-base font-semibold text-gray-800 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                  >
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </>
+    );
   }
 
   return (
@@ -383,6 +418,15 @@ export default function PublicReviewPage() {
         <meta name="robots" content="noindex, nofollow" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
+
+      <button
+        type="button"
+        onClick={function () { setLangSelected(false); }}
+        aria-label={t('langTitle')}
+        className="fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-white shadow-lg border border-gray-200 flex items-center justify-center text-[11px] font-bold text-purple-700 hover:bg-purple-50 transition-colors"
+      >
+        {lang === 'hi' ? 'हि' : (lang === 'mr' ? 'मर' : 'EN')}
+      </button>
 
       <div className="min-h-screen bg-[#F8F7FF] md:flex md:items-center md:justify-center md:py-10">
         <div className="w-full md:max-w-[440px] md:rounded-[28px] md:overflow-hidden md:shadow-2xl bg-[#F8F7FF]">
@@ -397,7 +441,7 @@ export default function PublicReviewPage() {
                   className="w-10 h-10 rounded-full border-4 animate-spin"
                   style={{ borderColor: 'rgba(255,255,255,0.25)', borderTopColor: '#ffffff' }}
                 />
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>{'Loading\u2026'}</p>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px' }}>{t('loading')}</p>
               </div>
             </div>
           )}
@@ -406,9 +450,9 @@ export default function PublicReviewPage() {
             <div className="flex items-center justify-center p-8 bg-white" style={{ minHeight: '320px' }}>
               <div className="text-center">
                 <p className="text-5xl mb-4">&#128279;</p>
-                <h1 className="text-xl font-bold text-gray-900 mb-2">Link not found</h1>
+                <h1 className="text-xl font-bold text-gray-900 mb-2">{t('linkNotFound')}</h1>
                 <p className="text-sm text-gray-500">
-                  This review link may have expired or is invalid. Please contact the business for a new link.
+                  {t('linkNotFoundBody')}
                 </p>
               </div>
             </div>
@@ -418,10 +462,9 @@ export default function PublicReviewPage() {
             <div className="flex items-center justify-center p-8 bg-white" style={{ minHeight: '320px' }}>
               <div className="text-center">
                 <p className="text-5xl mb-4">&#9989;</p>
-                <h1 className="text-xl font-bold text-gray-900 mb-2">Already submitted!</h1>
+                <h1 className="text-xl font-bold text-gray-900 mb-2">{t('alreadySubmitted')}</h1>
                 <p className="text-sm text-gray-500">
-                  {"You've already shared your feedback. Thank you" +
-                    (business && business.name ? ' for visiting ' + business.name : '') + '!'}
+                  {t('alreadySubmittedBody')(business && business.name)}
                 </p>
               </div>
             </div>
@@ -429,11 +472,11 @@ export default function PublicReviewPage() {
 
           {screen === SCREEN.IDENTIFY && business && (
             <>
-              <BusinessHeader business={business} />
+              <BusinessHeader business={business} subtitle={t('feedbackHelps')} />
               <div className="bg-white rounded-t-3xl -mt-6 px-6 pt-8 pb-8 relative">
-                <h2 className="text-lg font-bold text-gray-900 text-center mb-2">Before you rate us...</h2>
+                <h2 className="text-lg font-bold text-gray-900 text-center mb-2">{t('beforeYouRate')}</h2>
                 <p className="text-xs text-gray-400 text-center mb-6">
-                  {'We use this to save your visit and follow up if needed \u2014 never shared or sold.'}
+                  {t('beforeYouRateSub')}
                 </p>
                 <form onSubmit={handleIdentifySubmit}>
                   {idError && (
@@ -442,7 +485,7 @@ export default function PublicReviewPage() {
                   <div className="mb-3">
                     <input
                       type="text"
-                      placeholder="Your name"
+                      placeholder={t('namePlaceholder')}
                       value={idName}
                       onChange={function (e) { setIdName(e.target.value); }}
                       className="w-full bg-gray-100 rounded-xl px-4 py-3 text-base sm:text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200"
@@ -454,20 +497,20 @@ export default function PublicReviewPage() {
                       onChange={function (e) { setIdCountryCode(e.target.value); }}
                       className="bg-gray-100 rounded-xl px-2 text-base sm:text-sm text-gray-700 outline-none focus:ring-2 focus:ring-purple-200 shrink-0"
                     >
-                      <option value="+91">{'\uD83C\uDDEE\uD83C\uDDF3 +91'}</option>
-                      <option value="+1">{'\uD83C\uDDFA\uD83C\uDDF8 +1'}</option>
-                      <option value="+44">{'\uD83C\uDDEC\uD83C\uDDE7 +44'}</option>
-                      <option value="+971">{'\uD83C\uDDE6\uD83C\uDDEA +971'}</option>
-                      <option value="+65">{'\uD83C\uDDF8\uD83C\uDDEC +65'}</option>
-                      <option value="+61">{'\uD83C\uDDE6\uD83C\uDDFA +61'}</option>
-                      <option value="+92">{'\uD83C\uDDF5\uD83C\uDDF0 +92'}</option>
-                      <option value="+880">{'\uD83C\uDDE7\uD83C\uDDE9 +880'}</option>
-                      <option value="+94">{'\uD83C\uDDF1\uD83C\uDDF0 +94'}</option>
-                      <option value="+977">{'\uD83C\uDDF3\uD83C\uDDF5 +977'}</option>
+                      <option value="+91">{'🇮🇳 +91'}</option>
+                      <option value="+1">{'🇺🇸 +1'}</option>
+                      <option value="+44">{'🇬🇧 +44'}</option>
+                      <option value="+971">{'🇦🇪 +971'}</option>
+                      <option value="+65">{'🇸🇬 +65'}</option>
+                      <option value="+61">{'🇦🇺 +61'}</option>
+                      <option value="+92">{'🇵🇰 +92'}</option>
+                      <option value="+880">{'🇧🇩 +880'}</option>
+                      <option value="+94">{'🇱🇰 +94'}</option>
+                      <option value="+977">{'🇳🇵 +977'}</option>
                     </select>
                     <input
                       type="tel"
-                      placeholder="Phone number"
+                      placeholder={t('phonePlaceholder')}
                       value={idPhone}
                       onChange={function (e) { setIdPhone(e.target.value); }}
                       className="flex-1 min-w-0 bg-gray-100 rounded-xl px-4 py-3 text-base sm:text-sm text-gray-700 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-200"
@@ -479,7 +522,7 @@ export default function PublicReviewPage() {
                     className="w-full py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
                     style={{ backgroundColor: '#7C3AED' }}
                   >
-                    {idSubmitting ? 'Please wait\u2026' : 'Continue'}
+                    {idSubmitting ? t('pleaseWait') : t('continue')}
                   </button>
                   <button
                     type="button"
@@ -487,7 +530,7 @@ export default function PublicReviewPage() {
                     disabled={idSubmitting}
                     className="w-full py-3 mt-2 text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    Skip
+                    {t('skip')}
                   </button>
                 </form>
               </div>
@@ -496,7 +539,7 @@ export default function PublicReviewPage() {
 
           {screen === SCREEN.RATE && business && (
             <>
-              <BusinessHeader business={business} />
+              <BusinessHeader business={business} subtitle={t('feedbackHelps')} />
               <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
                 <div className="relative bg-white rounded-2xl shadow-lg p-6 text-center animate-slide-up" style={{ animationDelay: '150ms' }}>
                   {draftScreen && <BackButton onClick={function () { setDraftScreen(false); }} />}
@@ -521,10 +564,10 @@ export default function PublicReviewPage() {
                     /* ---------- 4-5 star: experience chips + live draft ---------- */
                     <div className="text-left">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 text-center">
-                        {'What stood out?'}
+                        {t('whatStoodOut')}
                       </p>
                       <div className="grid grid-cols-2 gap-2 mb-4">
-                        {getExperienceChips(business.type).map(function (c) {
+                        {getExperienceChips(business.type, lang).map(function (c) {
                           var isSelected = selectedChips.indexOf(c.key) !== -1;
                           return (
                             <button
@@ -542,21 +585,21 @@ export default function PublicReviewPage() {
                       {draftText && (
                         <>
                           <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-xs font-semibold text-gray-500">{'Your review draft'}</p>
+                            <p className="text-xs font-semibold text-gray-500">{t('yourReviewDraft')}</p>
                             <div className="flex gap-3">
                               <button
                                 type="button"
                                 onClick={function () { regenerateDraft(selectedChips); }}
                                 className="text-[11px] font-semibold text-purple-600 hover:text-purple-700"
                               >
-                                {'\u21bb Shuffle'}
+                                {'↻ ' + t('shuffle')}
                               </button>
                               <button
                                 type="button"
                                 onClick={handleMakeShorter}
                                 className="text-[11px] font-semibold text-purple-600 hover:text-purple-700"
                               >
-                                {'Make it shorter'}
+                                {t('makeItShorter')}
                               </button>
                             </div>
                           </div>
@@ -568,7 +611,7 @@ export default function PublicReviewPage() {
                             maxLength={600}
                           />
                           <p className="text-[10px] text-gray-300 mb-3">
-                            {'AI draft \u2014 review and edit for accuracy.'}
+                            {t('aiDraftNote')}
                           </p>
                           <div className="flex gap-2 mb-1">
                             <button
@@ -579,14 +622,14 @@ export default function PublicReviewPage() {
                               style={{ backgroundColor: '#7C3AED' }}
                             >
                               <GoogleLogo />
-                              {'Copy draft'}
+                              {t('copyDraft')}
                             </button>
                             <button
                               type="button"
                               onClick={handleEditDraft}
                               className="px-5 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                              Edit
+                              {t('edit')}
                             </button>
                           </div>
                         </>
@@ -598,17 +641,17 @@ export default function PublicReviewPage() {
                         disabled={submitting}
                         className="w-full mt-2 py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                       >
-                        {'Skip \u2014 just take me to Google'}
+                        {t('skipToGoogle')}
                       </button>
                       <p className="text-center text-[11px] text-gray-300 mt-1">
-                        {'This is just a starting point \u2014 edit it to match your own experience before posting.'}
+                        {t('startingPointNote')}
                       </p>
                     </div>
 
                   ) : issueScreen === 'A' ? (
                     /* ---------- 1-3 star, screen A: pick issue(s) ---------- */
                     <div className="text-left">
-                      {getIssueGroups(business.type).map(function (g) {
+                      {getIssueGroups(business.type, lang).map(function (g) {
                         return (
                           <div key={g.group} className="mb-4">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">{g.group}</p>
@@ -637,7 +680,7 @@ export default function PublicReviewPage() {
                         className="w-full mt-1 py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-40"
                         style={{ backgroundColor: '#7C3AED' }}
                       >
-                        Continue
+                        {t('continue')}
                       </button>
                     </div>
 
@@ -679,10 +722,10 @@ export default function PublicReviewPage() {
                         );
                       })}
 
-                      <p className="text-xs font-semibold text-gray-400 mb-2">{'Anything else? (Optional)'}</p>
+                      <p className="text-xs font-semibold text-gray-400 mb-2">{t('anythingElse')}</p>
                       <textarea
                         className="input resize-none h-24 mb-1 text-base sm:text-sm"
-                        placeholder="Share a short message..."
+                        placeholder={t('shareShortMessage')}
                         value={feedbackText}
                         onChange={function (e) { setFeedbackText(e.target.value); }}
                         maxLength={1000}
@@ -698,7 +741,7 @@ export default function PublicReviewPage() {
                           className="mt-0.5 w-4 h-4 accent-purple-600 flex-shrink-0"
                         />
                         <span className="text-xs text-gray-600 text-left">
-                          {'I\u2019d like someone to follow up with me about this'}
+                          {t('followUpCheckbox')}
                         </span>
                       </label>
                       <button
@@ -708,8 +751,8 @@ export default function PublicReviewPage() {
                         style={{ backgroundColor: '#7C3AED' }}
                       >
                         {submitting
-                          ? <><span className="spinner" />{' Sending\u2026'}</>
-                          : 'Send Feedback'
+                          ? <><span className="spinner" />{' ' + t('sending')}</>
+                          : t('sendFeedback')
                         }
                       </button>
                       <a
@@ -719,10 +762,10 @@ export default function PublicReviewPage() {
                         className="w-full mt-3 py-3 rounded-xl border border-gray-200 flex items-center justify-center gap-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                       >
                         <GoogleLogo />
-                        {'Leave us a review on Google'}
+                        {t('leaveGoogleReview')}
                       </a>
                       <p className="text-center text-[11px] text-gray-300 mt-2">
-                        {"It's your choice \u2014 send feedback, post publicly, or both."}
+                        {t('yourChoiceNote')}
                       </p>
                     </form>
 
@@ -731,33 +774,43 @@ export default function PublicReviewPage() {
                     <>
                       <StarRating value={rating} onChange={handleRatingSelect} size="lg" />
                       <p className="text-xs mt-5" style={{ color: '#D1D5DB' }}>
-                        {rating > 0 ? 'Tap a different star to change it' : 'Tap a star to rate your experience'}
+                        {rating > 0 ? t('tapStarToChange') : t('tapStarToRate')}
                       </p>
+                      {rating > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleRatingContinue}
+                          className="w-full mt-4 py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: '#7C3AED' }}
+                        >
+                          {t('continue')}
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
               </div>
               <p className="text-center pb-8" style={{ fontSize: '11px', color: '#D1D5DB' }}>
-                Powered by ReviewBooster
+                {t('poweredBy')}
               </p>
             </>
           )}
 
           {screen === SCREEN.THANK_PUBLIC && business && (
             <>
-              <BusinessHeader business={business} />
+              <BusinessHeader business={business} subtitle={t('feedbackHelps')} />
               <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
                 <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-                  <p className="text-5xl mb-4">{'\uD83C\uDF89'}</p>
+                  <p className="text-5xl mb-4">{'🎉'}</p>
                   <h1 className="text-xl font-bold text-gray-900 mb-2">
-                    Thanks for the great rating!
+                    {t('thanksGreatRating')}
                   </h1>
                   <p className="text-sm text-gray-500 mb-5">
-                    {'We\u2019ve let the ' + business.name + ' team know. We appreciate you taking the time.'}
+                    {t('thanksGreatRatingBody')(business.name)}
                   </p>
                   {draftCopied && (
                     <p className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2 mb-4">
-                      {'\u2713 Your review was copied \u2014 just paste it in the Google tab that opened.'}
+                      {t('copiedNote')}
                     </p>
                   )}
                   {business.google_review_url && (
@@ -766,34 +819,33 @@ export default function PublicReviewPage() {
                       onClick={function () { openGoogleReview(business.google_review_url); }}
                       className="text-xs font-semibold text-purple-600 hover:text-purple-700"
                     >
-                      {usedDraft ? 'Didn\u2019t open? Tap to open Google Review' : 'Leave a Review on Google'}
+                      {usedDraft ? t('didntOpenTapToOpen') : t('leaveReviewOnGoogle')}
                     </button>
                   )}
                 </div>
               </div>
               <p className="text-center pb-8" style={{ fontSize: '11px', color: '#D1D5DB' }}>
-                Powered by ReviewBooster
+                {t('poweredBy')}
               </p>
             </>
           )}
 
           {screen === SCREEN.THANK_PRIVATE && business && (
             <>
-              <BusinessHeader business={business} />
+              <BusinessHeader business={business} subtitle={t('feedbackHelps')} />
               <div className="px-5 pb-8" style={{ marginTop: '-32px' }}>
                 <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-                  <p className="text-5xl mb-4">{'\uD83D\uDE4F'}</p>
+                  <p className="text-5xl mb-4">{'🙏'}</p>
                   <h1 className="text-xl font-bold text-gray-900 mb-2">
-                    Thank you for your honesty
+                    {t('thankYouHonesty')}
                   </h1>
                   <p className="text-sm text-gray-500">
-                    {'Your feedback has been shared privately with the ' + business.name +
-                      ' team. We take every comment seriously and will work to improve.'}
+                    {t('thankYouHonestyBody')(business.name)}
                   </p>
                 </div>
               </div>
               <p className="text-center pb-8" style={{ fontSize: '11px', color: '#D1D5DB' }}>
-                Powered by ReviewBooster
+                {t('poweredBy')}
               </p>
             </>
           )}
