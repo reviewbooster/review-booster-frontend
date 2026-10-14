@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
@@ -14,14 +14,14 @@ import { useProductFeatures } from "../context/ProductFeaturesContext";
 const OWNER_NAV_TOP = [
   {
     href: "/dashboard",
-    icon: "\u25C8",
+    icon: "◈",
     label: "Home",
     matchPrefixes: ["/dashboard"],
     exact: true,
   },
   {
     href: "/dashboard/reviews-hub",
-    icon: "\u2605",
+    icon: "★",
     label: "Reviews",
     badge: true,
     matchPrefixes: [
@@ -34,13 +34,13 @@ const OWNER_NAV_TOP = [
   },
   {
     href: "/dashboard/customers",
-    icon: "\uD83D\uDC65",
+    icon: "👥",
     label: "Customers",
     matchPrefixes: ["/dashboard/customers"],
   },
   {
     href: "/dashboard/growth-hub",
-    icon: "\uD83D\uDCC8",
+    icon: "📈",
     label: "Growth",
     matchPrefixes: [
       "/dashboard/growth-hub",
@@ -52,16 +52,16 @@ const OWNER_NAV_TOP = [
   },
   {
     href: "/dashboard/settings-hub",
-    icon: "\u2699",
+    icon: "⚙",
     label: "Settings",
     matchPrefixes: ["/dashboard/settings-hub", "/dashboard/team", "/dashboard/settings"],
   },
 ];
 
 const ADMIN_NAV = [
-  { href: "/dashboard/admin/dashboard",    icon: "\uD83D\uDCCA", label: "Dashboard",    mobileLabel: "Dashboard", activeClass: "bg-purple-50 text-purple-600" },
-  { href: "/dashboard/admin",              icon: "\uD83C\uDFE2", label: "Businesses",   mobileLabel: "Businesses", activeClass: "bg-blue-50 text-blue-600" },
-  { href: "/dashboard/requests",           icon: "\uD83D\uDD13", label: "Requests",     mobileLabel: "Requests",  activeClass: "bg-amber-50 text-amber-600", count: true },
+  { href: "/dashboard/admin/dashboard",    icon: "📊", label: "Dashboard",    mobileLabel: "Dashboard", activeClass: "bg-purple-50 text-purple-600" },
+  { href: "/dashboard/admin",              icon: "🏢", label: "Businesses",   mobileLabel: "Businesses", activeClass: "bg-blue-50 text-blue-600" },
+  { href: "/dashboard/requests",           icon: "🔓", label: "Requests",     mobileLabel: "Requests",  activeClass: "bg-amber-50 text-amber-600", count: true },
 ];
 
 // Grouped -- used for the desktop sidebar, matching the Super Admin doc's
@@ -270,6 +270,17 @@ function SettingsGearIcon({ active }) {
   );
 }
 
+// Used only in the account dropdown, next to "Switch to Owner Dashboard"
+// (Phase 2 -- spec section 3 dashboard-switching behavior).
+function SwitchIcon() {
+  return (
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+      <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Icons for the flat top-level nav -- desktop uses the emoji/text icons in
 // OWNER_NAV_TOP directly; mobile top bar + bottom bar use these SVG versions.
 const TOP_NAV_ICONS = {
@@ -299,7 +310,7 @@ function describePlan(planInfo) {
 function PlanTag({ planInfo }) {
   var d = describePlan(planInfo);
   if (!d) return null;
-  var label = d.onTrial ? "Trial \u00b7 " + d.trialLeft + "d" : d.name;
+  var label = d.onTrial ? "Trial · " + d.trialLeft + "d" : d.name;
   var cls = d.onTrial
     ? "bg-amber-50 text-amber-700 border-amber-200"
     : (d.plan === "free" || d.plan === "trial" || d.plan === "expired"
@@ -308,7 +319,7 @@ function PlanTag({ planInfo }) {
   return (
     <Link
       href="/dashboard/settings/billing"
-      title={d.onTrial ? d.name + " trial \u2014 " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left" : d.name + " plan"}
+      title={d.onTrial ? d.name + " trial — " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left" : d.name + " plan"}
       className={"inline-flex items-center px-1.5 py-1 rounded-md border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap leading-none " + cls}
     >
       {label}
@@ -316,11 +327,11 @@ function PlanTag({ planInfo }) {
   );
 }
 
-// Text for the profile dropdown, e.g. "Growth trial \u00b7 9 days left".
+// Text for the profile dropdown, e.g. "Growth trial · 9 days left".
 function planMenuText(planInfo) {
   var d = describePlan(planInfo);
   if (!d) return "";
-  if (d.onTrial) return d.name + " trial \u00b7 " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left";
+  if (d.onTrial) return d.name + " trial · " + d.trialLeft + " day" + (d.trialLeft === 1 ? "" : "s") + " left";
   return d.name + " plan";
 }
 
@@ -421,6 +432,14 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
     });
   }
 
+  // Phase 2 -- opens the Owner Dashboard (spec section 3: "Only authorized
+  // owners see the switch. The owner opens the Owner Dashboard, normally
+  // landing on Overview."). Only ever shown to role === "owner".
+  function goToOwnerDashboard() {
+    setDropdownOpen(false);
+    router.push("/owner/overview");
+  }
+
   function renderOwnerTop(onItemClick, itemPaddingClass) {
     return (
       <>
@@ -496,7 +515,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                     className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 hover:text-gray-600 transition-colors"
                   >
                     <span>{group.header}</span>
-                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"\u203A"}</span>
+                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"›"}</span>
                   </button>
                   {isOpen && (
                     <div className="mt-0.5 mb-2">
@@ -550,11 +569,23 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
             </button>
             {dropdownOpen && (
               <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-50">
+                {user?.role === "owner" && (
+                  <>
+                    <button
+                      onClick={goToOwnerDashboard}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      <SwitchIcon />
+                      Switch to Owner Dashboard
+                    </button>
+                    <div className="h-px bg-gray-100" />
+                  </>
+                )}
                 <button
                   onClick={() => { setDropdownOpen(false); setChangePasswordOpen(true); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                 >
-                  <span>{"\uD83D\uDD12"}</span>
+                  <span>{"🔒"}</span>
                   Change Password
                 </button>
                 <div className="h-px bg-gray-100" />
@@ -562,7 +593,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                   onClick={logout}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
                 >
-                  <span>{"\u238B"}</span>
+                  <span>{"⎋"}</span>
                   Sign out
                 </button>
               </div>
@@ -610,13 +641,25 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
               <div className="absolute top-full right-0 mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-gray-900 text-sm font-semibold truncate">{user?.name}</p>
-                  <p className="text-gray-400 text-xs capitalize mt-0.5">{user?.role}{planMenuText(planInfo) ? " \u00b7 " + planMenuText(planInfo) : ""}</p>
+                  <p className="text-gray-400 text-xs capitalize mt-0.5">{user?.role}{planMenuText(planInfo) ? " · " + planMenuText(planInfo) : ""}</p>
                 </div>
+                {user?.role === "owner" && (
+                  <>
+                    <button
+                      onClick={goToOwnerDashboard}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+                    >
+                      <SwitchIcon />
+                      Switch to Owner Dashboard
+                    </button>
+                    <div className="h-px bg-gray-100" />
+                  </>
+                )}
                 <button
                   onClick={() => { setDropdownOpen(false); setChangePasswordOpen(true); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                 >
-                  <span>{"\uD83D\uDD12"}</span>
+                  <span>{"🔒"}</span>
                   Change Password
                 </button>
                 <div className="h-px bg-gray-100" />
@@ -624,7 +667,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                   onClick={logout}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
                 >
-                  <span>{"\u238B"}</span>
+                  <span>{"⎋"}</span>
                   Sign out
                 </button>
               </div>
@@ -752,7 +795,7 @@ export default function Sidebar({ unresolvedCount = 0, resetRequestCount = 0 }) 
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[11px] font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 hover:text-gray-600 transition-colors"
                   >
                     <span>{group.header}</span>
-                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"\u203A"}</span>
+                    <span className={"transition-transform duration-150 " + (isOpen ? "rotate-90" : "")}>{"›"}</span>
                   </button>
                   {isOpen && (
                     <div className="mt-0.5 mb-2">
