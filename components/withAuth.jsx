@@ -1,4 +1,4 @@
-﻿import { useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
 
@@ -29,6 +29,17 @@ export default function withAuth(WrappedPage, options = {}) {
         return;
       }
 
+      // Eligible multi-location owners landing on the bare branch-dashboard
+      // root (bookmark, browser back, a stale link) default to the Owner
+      // Dashboard instead. Only the exact "/dashboard" path redirects --
+      // once an owner has deliberately switched to a specific branch via
+      // "Switch to Branch Dashboard" (which lands somewhere more specific
+      // than bare "/dashboard"), this does not pull them back out.
+      if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard") {
+        router.replace("/owner");
+        return;
+      }
+
       if (requiredRole && user?.role !== requiredRole && user?.role !== "super_admin") {
         router.replace("/dashboard");
       }
@@ -50,6 +61,7 @@ export default function withAuth(WrappedPage, options = {}) {
     if (user?.onboarding_completed === false && !router.pathname.startsWith("/onboarding")) return null;
     const superAdminPaths = ["/dashboard/admin", "/dashboard/requests"];
     if (user?.role === "super_admin" && !superAdminPaths.some(p => router.pathname.startsWith(p))) return null;
+    if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard") return null;
     if (requiredRole && user?.role !== requiredRole && user?.role !== "super_admin") return null;
 
     return <WrappedPage {...props} />;

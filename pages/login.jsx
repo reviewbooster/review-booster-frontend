@@ -1,4 +1,4 @@
-﻿/**
+/**
  * pages/login.jsx
  *
  * Login screen. Connects to POST /api/auth/login.
@@ -228,7 +228,7 @@ function HelpButton() {
 }
 
 export default function LoginPage() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   const [email,        setEmail]        = useState('');
@@ -238,12 +238,15 @@ export default function LoginPage() {
   const [error,        setError]        = useState('');
   const [loading,      setLoading]      = useState(false);
 
-  // Redirect if already logged in
+  // Redirect if already logged in. Eligible multi-location owners land on
+  // the Owner Dashboard by default (spec section 3: "The owner opens the
+  // Owner Dashboard, normally landing on Overview") instead of the normal
+  // branch dashboard.
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(user?.role === 'owner' && user?.multi_location ? '/owner' : '/dashboard');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -261,6 +264,8 @@ export default function LoginPage() {
 
       if (data.must_change_password) {
         router.replace('/change-password');
+      } else if (data.user?.role === 'owner' && data.user?.multi_location) {
+        router.replace('/owner');
       } else {
         router.replace('/dashboard');
       }
