@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/owner/team.jsx
  *
  * Phase 3 (Locations and Team, spec section 8): branch manager accounts
@@ -15,15 +15,51 @@
  * against GET /api/locations, since /business/staff only returns ids) and
  * can be changed via a location multi-select, which PATCHes the complete
  * desired set to /business/staff/:id/locations -- not an add/remove diff.
+ *
+ * WhatsApp invite (added): AddStaffModal optionally collects a phone
+ * number. After the account is created, instead of closing right away it
+ * shows a one-tap "Send via WhatsApp" step with a single ready-to-send
+ * message -- greeting, login link, username (email), and temporary
+ * password -- built and opened the same way reviews.jsx already does for
+ * review requests: a wa.me link, navigated to with window.location.href
+ * (not window.open) for reliable mobile WhatsApp handoff without popup
+ * blocking.
  */
 import { useEffect, useMemo, useState } from 'react';
 import OwnerDashboardLayout from '../../components/OwnerDashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 
+const LOGIN_URL = 'https://review-booster-frontend-rust.vercel.app/login';
+
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Accepts a loosely-typed Indian mobile number (with or without +91, with
+// spaces/dashes, with a leading 0) and normalizes it to bare E.164 digits
+// (no leading +) for the wa.me link. Returns null if it doesn't look like
+// a usable number at all.
+function normalizePhoneForWhatsapp(raw) {
+  if (!raw) return null;
+  let digits = raw.replace(/[^\d+]/g, '');
+  digits = digits.replace(/^\+/, '');
+  digits = digits.replace(/^0+/, '');
+  if (digits.length === 10) digits = '91' + digits;
+  if (!/^\d{11,15}$/.test(digits)) return null;
+  return digits;
+}
+
+function buildInviteMessage(name, email, password) {
+  return (
+    'Hi ' + name + ',\n\n' +
+    'You\'ve been added as a Branch Manager on ReviewBooster.\n\n' +
+    'Login link: ' + LOGIN_URL + '\n' +
+    'Username: ' + email + '\n' +
+    'Temporary password: ' + password + '\n\n' +
+    'Please log in and change your password on first login.'
+  );
 }
 
 function LocationCheckboxList({ locations, selectedIds, onChange }) {
@@ -65,10 +101,17 @@ function LocationCheckboxList({ locations, selectedIds, onChange }) {
 function AddStaffModal({ locations, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [locationIds, setLocationIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Once the account is created, if a phone number was given we switch to
+  // this step instead of closing -- holds exactly what's needed to build
+  // the WhatsApp message (never re-fetched from the server afterwards,
+  // since the plaintext password only ever exists here, in this form).
+  const [created, setCreated] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -76,6 +119,11 @@ function AddStaffModal({ locations, onClose, onCreated }) {
     if (!name.trim()) { setError('Name is required.'); return; }
     if (!email.trim()) { setError('Email is required.'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !normalizePhoneForWhatsapp(trimmedPhone)) {
+      setError('That phone number doesn\'t look right. Use a 10-digit mobile number.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -84,14 +132,53 @@ function AddStaffModal({ locations, onClose, onCreated }) {
         email: email.trim(),
         password,
         location_ids: locationIds,
+        phone: trimmedPhone || undefined,
       });
       onCreated(res.data.data);
-      onClose();
+      if (trimmedPhone) {
+        setCreated({ name: name.trim(), email: email.trim(), password, phone: trimmedPhone });
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSendWhatsapp() {
+    const digits = normalizePhoneForWhatsapp(created.phone);
+    if (!digits) return;
+    const msg = buildInviteMessage(created.name, created.email, created.password);
+    const waUrl = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
+    // Navigating the current tab (not a new window) is what reliably hands
+    // off to WhatsApp on mobile and sidesteps popup blocking -- same
+    // pattern used for review requests in pages/dashboard/reviews.jsx.
+    window.location.href = waUrl;
+  }
+
+  if (created) {
+    const message = buildInviteMessage(created.name, created.email, created.password);
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto" onClick={function(e) { e.stopPropagation(); }}>
+          <h2 className="font-bold text-gray-900 mb-1">{'Manager added ✓'}</h2>
+          <p className="text-xs text-gray-400 mb-4">Send their login details to {created.phone} on WhatsApp.</p>
+          <div className="mb-5 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600 whitespace-pre-wrap">
+            {message}
+          </div>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">
+              Skip
+            </button>
+            <button type="button" onClick={handleSendWhatsapp} className="btn-primary flex-1 justify-center">
+              {'Send via WhatsApp'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -107,6 +194,11 @@ function AddStaffModal({ locations, onClose, onCreated }) {
           <div className="mb-3">
             <label className="label">Email</label>
             <input type="email" className="input" value={email} onChange={function(e) { setEmail(e.target.value); }} placeholder="them@example.com" />
+          </div>
+          <div className="mb-3">
+            <label className="label">Phone (optional)</label>
+            <input type="tel" className="input" value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="10-digit mobile number" />
+            <p className="text-[10px] text-gray-400 mt-1">Add this to send their login details over WhatsApp.</p>
           </div>
           <div className="mb-3">
             <label className="label">Temporary Password</label>
