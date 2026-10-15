@@ -31,7 +31,7 @@ import OwnerDashboardLayout from '../../components/OwnerDashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 
-const LOGIN_URL = 'https://review-booster-frontend-rust.vercel.app/login';
+const LOGIN_URL = 'https://reviewbooster.adcend.in/login';
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -467,3 +467,4 @@ function OwnerTeamPage() {
 }
 
 export default withAuth(OwnerTeamPage, { requiredRole: 'owner' });
+
