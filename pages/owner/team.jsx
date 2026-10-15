@@ -63,6 +63,30 @@ function buildInviteMessage(name, email, password) {
   );
 }
 
+// Used to resend login details to an EXISTING branch manager -- their
+// original password is never available after creation (only a hash is
+// stored), so this leaves it out rather than showing a stale/wrong one.
+function buildResendMessage(name, email) {
+  return (
+    'Hi ' + name + ',\n\n' +
+    'Here\'s your ReviewBooster login again:\n\n' +
+    'Login link: ' + LOGIN_URL + '\n' +
+    'Username: ' + email + '\n\n' +
+    'If you\'ve forgotten your password, ask your manager to reset it.'
+  );
+}
+
+function sendWhatsapp(phone, message) {
+  const digits = normalizePhoneForWhatsapp(phone);
+  if (!digits) return false;
+  const waUrl = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(message);
+  // Navigating the current tab (not a new window) is what reliably hands
+  // off to WhatsApp on mobile and sidesteps popup blocking -- same
+  // pattern used for review requests in pages/dashboard/reviews.jsx.
+  window.location.href = waUrl;
+  return true;
+}
+
 function LocationCheckboxList({ locations, selectedIds, onChange }) {
   function toggle(id) {
     const idStr = String(id);
@@ -108,10 +132,10 @@ function AddStaffModal({ locations, onClose, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Once the account is created, we switch to this step instead of
-  // closing -- holds exactly what's needed to build the WhatsApp message
-  // (never re-fetched from the server afterwards, since the plaintext
-  // password only ever exists here, in this form).
+  // Once the account is created, if a phone number was given we switch to
+  // this step instead of closing -- holds exactly what's needed to build
+  // the WhatsApp message (never re-fetched from the server afterwards,
+  // since the plaintext password only ever exists here, in this form).
   const [created, setCreated] = useState(null);
 
   async function handleSubmit(e) {
@@ -146,14 +170,7 @@ function AddStaffModal({ locations, onClose, onCreated }) {
   }
 
   function handleSendWhatsapp() {
-    const digits = normalizePhoneForWhatsapp(created.phone);
-    if (!digits) return;
-    const msg = buildInviteMessage(created.name, created.email, created.password);
-    const waUrl = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
-    // Navigating the current tab (not a new window) is what reliably hands
-    // off to WhatsApp on mobile and sidesteps popup blocking -- same
-    // pattern used for review requests in pages/dashboard/reviews.jsx.
-    window.location.href = waUrl;
+    sendWhatsapp(created.phone, buildInviteMessage(created.name, created.email, created.password));
   }
 
   if (created) {
@@ -221,18 +238,27 @@ function AddStaffModal({ locations, onClose, onCreated }) {
 
 function EditLocationsModal({ staffMember, locations, onClose, onSaved }) {
   const [locationIds, setLocationIds] = useState((staffMember.location_ids || []).map(String));
+  const [phone, setPhone] = useState(staffMember.phone || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSave() {
-    setSaving(true);
     setError('');
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !normalizePhoneForWhatsapp(trimmedPhone)) {
+      setError('That phone number doesn\'t look right. Use a 10-digit mobile number.');
+      return;
+    }
+    setSaving(true);
     try {
-      const res = await api.patch('/business/staff/' + staffMember._id + '/locations', { location_ids: locationIds });
+      const res = await api.patch('/business/staff/' + staffMember._id + '/locations', {
+        location_ids: locationIds,
+        phone: trimmedPhone,
+      });
       onSaved(res.data.data);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not update locations. Please try again.');
+      setError(err.response?.data?.error || 'Could not save changes. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -241,10 +267,16 @@ function EditLocationsModal({ staffMember, locations, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={function(e) { e.stopPropagation(); }}>
-        <h2 className="font-bold text-gray-900 mb-1">Edit Locations</h2>
+        <h2 className="font-bold text-gray-900 mb-1">Edit Details</h2>
         <p className="text-xs text-gray-400 mb-4">{staffMember.name}</p>
         {error && <div className="alert-error mb-4"><span>{'⚠'}</span><span>{error}</span></div>}
+        <div className="mb-4">
+          <label className="label">Phone</label>
+          <input type="tel" className="input" value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="10-digit mobile number" />
+          <p className="text-[10px] text-gray-400 mt-1">Used for the WhatsApp login-resend button on their row.</p>
+        </div>
         <div className="mb-5">
+          <label className="label mb-1.5 block">Locations</label>
           <LocationCheckboxList locations={locations} selectedIds={locationIds} onChange={setLocationIds} />
         </div>
         <div className="flex gap-3">
@@ -308,7 +340,15 @@ function OwnerTeamPage() {
         return s._id === updated._id ? Object.assign({}, s, updated) : s;
       });
     });
-    showNotice('Locations updated.');
+    showNotice('Details updated.');
+  }
+
+  function handleResendWhatsapp(s) {
+    if (!s.phone) {
+      setEditingStaff(s);
+      return;
+    }
+    sendWhatsapp(s.phone, buildResendMessage(s.name, s.email));
   }
 
   async function handleRemove(id) {
@@ -393,6 +433,14 @@ function OwnerTeamPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <p className="text-xs text-gray-400 hidden sm:block">{'Added ' + fmtDate(s.created_at)}</p>
+                  <button
+                    type="button"
+                    onClick={function() { handleResendWhatsapp(s); }}
+                    title={s.phone ? 'Send login link on WhatsApp' : 'Add a phone number first'}
+                    className="text-xs font-semibold text-green-600 hover:text-green-700 transition-colors"
+                  >
+                    {'WhatsApp'}
+                  </button>
                   <button
                     type="button"
                     onClick={function() { setEditingStaff(s); }}
