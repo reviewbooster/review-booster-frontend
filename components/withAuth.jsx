@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../context/AuthContext";
 
@@ -8,6 +8,19 @@ export default function withAuth(WrappedPage, options = {}) {
   function AuthGuard(props) {
     const { user, isLoading, isAuthenticated } = useAuth();
     const router = useRouter();
+
+    // Captured once, synchronously, on mount -- true only when this page
+    // instance was reached via select-branch.jsx's deliberate switch (see
+    // its comment). Consumed immediately so a later bookmark/back-button
+    // visit to /dashboard never sees it again. Reading it this way (not
+    // inside an effect) keeps the render-guard below and the redirect
+    // effect in agreement on the very first render, instead of racing.
+    const [justSwitchedBranch] = useState(() => {
+      if (typeof window === "undefined") return false;
+      const flag = sessionStorage.getItem("rb_branch_switch") === "1";
+      if (flag) sessionStorage.removeItem("rb_branch_switch");
+      return flag;
+    });
 
     useEffect(() => {
       if (isLoading) return;
@@ -31,11 +44,10 @@ export default function withAuth(WrappedPage, options = {}) {
 
       // Eligible multi-location owners landing on the bare branch-dashboard
       // root (bookmark, browser back, a stale link) default to the Owner
-      // Dashboard instead. Only the exact "/dashboard" path redirects --
-      // once an owner has deliberately switched to a specific branch via
-      // "Switch to Branch Dashboard" (which lands somewhere more specific
-      // than bare "/dashboard"), this does not pull them back out.
-      if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard") {
+      // Dashboard instead -- but NOT right after a deliberate branch
+      // switch via select-branch.jsx, which is the one legitimate reason
+      // to land exactly here (see justSwitchedBranch above).
+      if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard" && !justSwitchedBranch) {
         router.replace("/owner");
         return;
       }
@@ -43,7 +55,7 @@ export default function withAuth(WrappedPage, options = {}) {
       if (requiredRole && user?.role !== requiredRole && user?.role !== "super_admin") {
         router.replace("/dashboard");
       }
-    }, [isLoading, isAuthenticated, user, router]);
+    }, [isLoading, isAuthenticated, user, router, justSwitchedBranch]);
 
     if (isLoading) {
       return (
@@ -61,7 +73,7 @@ export default function withAuth(WrappedPage, options = {}) {
     if (user?.onboarding_completed === false && !router.pathname.startsWith("/onboarding")) return null;
     const superAdminPaths = ["/dashboard/admin", "/dashboard/requests"];
     if (user?.role === "super_admin" && !superAdminPaths.some(p => router.pathname.startsWith(p))) return null;
-    if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard") return null;
+    if (user?.role === "owner" && user?.multi_location && router.pathname === "/dashboard" && !justSwitchedBranch) return null;
     if (requiredRole && user?.role !== requiredRole && user?.role !== "super_admin") return null;
 
     return <WrappedPage {...props} />;

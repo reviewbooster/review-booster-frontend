@@ -61,6 +61,12 @@ function SelectBranchPage() {
     api.patch('/locations/active', { location_id: loc._id })
       .then(function() {
         updateUser({ active_location_id: loc._id });
+        // Marks this as a deliberate switch so withAuth's "eligible
+        // multi-location owners default to /owner" rule doesn't bounce us
+        // straight back out before the branch dashboard ever loads --
+        // that rule is only meant for a bookmark/back-button landing on a
+        // bare /dashboard, not for the one legitimate reason to BE there.
+        if (typeof window !== 'undefined') sessionStorage.setItem('rb_branch_switch', '1');
         router.replace('/dashboard');
       })
       .catch(function(err) {
