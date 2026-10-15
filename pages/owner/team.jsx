@@ -16,14 +16,15 @@
  * can be changed via a location multi-select, which PATCHes the complete
  * desired set to /business/staff/:id/locations -- not an add/remove diff.
  *
- * WhatsApp invite (added): AddStaffModal optionally collects a phone
- * number. After the account is created, instead of closing right away it
+ * WhatsApp invite (added): AddStaffModal requires a phone number so the
+ * owner always has a number to send to. After the account is created it
  * shows a one-tap "Send via WhatsApp" step with a single ready-to-send
  * message -- greeting, login link, username (email), and temporary
  * password -- built and opened the same way reviews.jsx already does for
  * review requests: a wa.me link, navigated to with window.location.href
  * (not window.open) for reliable mobile WhatsApp handoff without popup
- * blocking.
+ * blocking. There is no call option anywhere -- just the one WhatsApp
+ * send button.
  */
 import { useEffect, useMemo, useState } from 'react';
 import OwnerDashboardLayout from '../../components/OwnerDashboardLayout';
@@ -107,10 +108,10 @@ function AddStaffModal({ locations, onClose, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Once the account is created, if a phone number was given we switch to
-  // this step instead of closing -- holds exactly what's needed to build
-  // the WhatsApp message (never re-fetched from the server afterwards,
-  // since the plaintext password only ever exists here, in this form).
+  // Once the account is created, we switch to this step instead of
+  // closing -- holds exactly what's needed to build the WhatsApp message
+  // (never re-fetched from the server afterwards, since the plaintext
+  // password only ever exists here, in this form).
   const [created, setCreated] = useState(null);
 
   async function handleSubmit(e) {
@@ -120,7 +121,8 @@ function AddStaffModal({ locations, onClose, onCreated }) {
     if (!email.trim()) { setError('Email is required.'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     const trimmedPhone = phone.trim();
-    if (trimmedPhone && !normalizePhoneForWhatsapp(trimmedPhone)) {
+    if (!trimmedPhone) { setError('Phone number is required, so you can send their login details on WhatsApp.'); return; }
+    if (!normalizePhoneForWhatsapp(trimmedPhone)) {
       setError('That phone number doesn\'t look right. Use a 10-digit mobile number.');
       return;
     }
@@ -132,14 +134,10 @@ function AddStaffModal({ locations, onClose, onCreated }) {
         email: email.trim(),
         password,
         location_ids: locationIds,
-        phone: trimmedPhone || undefined,
+        phone: trimmedPhone,
       });
       onCreated(res.data.data);
-      if (trimmedPhone) {
-        setCreated({ name: name.trim(), email: email.trim(), password, phone: trimmedPhone });
-      } else {
-        onClose();
-      }
+      setCreated({ name: name.trim(), email: email.trim(), password, phone: trimmedPhone });
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
@@ -196,9 +194,9 @@ function AddStaffModal({ locations, onClose, onCreated }) {
             <input type="email" className="input" value={email} onChange={function(e) { setEmail(e.target.value); }} placeholder="them@example.com" />
           </div>
           <div className="mb-3">
-            <label className="label">Phone (optional)</label>
+            <label className="label">Phone</label>
             <input type="tel" className="input" value={phone} onChange={function(e) { setPhone(e.target.value); }} placeholder="10-digit mobile number" />
-            <p className="text-[10px] text-gray-400 mt-1">Add this to send their login details over WhatsApp.</p>
+            <p className="text-[10px] text-gray-400 mt-1">Used to send their login details over WhatsApp.</p>
           </div>
           <div className="mb-3">
             <label className="label">Temporary Password</label>
