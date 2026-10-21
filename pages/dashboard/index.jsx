@@ -242,7 +242,7 @@ function DashboardPage() {
   // Unresolved private-feedback count, for the dashboard badge/callout.
   useEffect(() => {
     if (user?.role === 'super_admin') return;
-    api.get('/reviews/private?page=1&limit=1')
+    api.get('/reviews/private?page=1&limit=1' + (user?.active_location_id ? '&location_id=' + user.active_location_id : ''))
       .then((res) => setUnresolvedCount(res.data?.totalUnresolved ?? 0))
       .catch(() => { /* silent */ });
     api.get('/follow-ups?status=due')
@@ -284,7 +284,7 @@ function DashboardPage() {
         const query = dateMode === 'range' && rangeStart && rangeEnd
           ? 'start_date=' + rangeStart + '&end_date=' + rangeEnd
           : 'days=' + selectedDays;
-        const sumRes = await api.get('/analytics/summary?' + query);
+        const sumRes = await api.get('/analytics/summary?' + query + (user?.active_location_id ? '&location_id=' + user.active_location_id : ''));
         setSummary(sumRes.data.data);
       } catch {
         setError('Failed to load dashboard data.');
@@ -294,7 +294,7 @@ function DashboardPage() {
       }
     };
     load();
-  }, [selectedDays, dateMode, rangeStart, rangeEnd]);
+  }, [selectedDays, dateMode, rangeStart, rangeEnd, user]);
 
   if (loading) return <DashboardSkeleton />;
 
