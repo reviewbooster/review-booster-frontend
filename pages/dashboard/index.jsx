@@ -205,7 +205,10 @@ function DashboardPage() {
   // Total verified referrals -- quiet, all-time count for the summary card below.
   useEffect(() => {
     if (user?.role === 'super_admin') return;
-    api.get('/referrals/stats')
+    const branchQuery = (user?.role === 'branch_manager' && user?.active_location_id)
+      ? '?location_id=' + user.active_location_id
+      : '';
+    api.get('/referrals/stats' + branchQuery)
       .then((res) => setReferralTotal(res.data?.data?.total_redeemed ?? 0))
       .catch(() => { /* silent */ });
   }, [user]);
