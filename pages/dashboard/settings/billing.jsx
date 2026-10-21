@@ -1,6 +1,6 @@
 ﻿/**
  * pages/dashboard/settings/billing.jsx
- * Plan & Billing -- current plan for staff, full BillingPanel for owners.
+ * Plan & Billing -- current plan for branch managers/staff, full BillingPanel for owners.
  * Split out of the old monolithic settings.jsx into its own category page.
  */
 
@@ -21,14 +21,14 @@ var PLAN_COLORS = {
 
 function BillingSettingsPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const isReadOnly = user?.role !== 'owner';
 
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [business, setBusiness] = useState(null);
 
   useEffect(function() {
-    if (!isStaff) { setLoading(false); return; }
+    if (!isReadOnly) { setLoading(false); return; }
     var load = async function() {
       try {
         var res = await api.get('/business/my-settings');
@@ -40,7 +40,7 @@ function BillingSettingsPage() {
       }
     };
     load();
-  }, [isStaff]);
+  }, [isReadOnly]);
 
   if (loading) {
     return (
@@ -70,7 +70,7 @@ function BillingSettingsPage() {
           <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3 mb-4">{error}</p>
         )}
 
-        {isStaff ? (
+        {isReadOnly ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>

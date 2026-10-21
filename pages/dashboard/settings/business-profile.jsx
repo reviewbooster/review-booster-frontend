@@ -14,7 +14,7 @@ import GoogleNumbersCard from '../../../components/GoogleNumbersCard';
 
 function BusinessProfilePage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const isReadOnly = user?.role !== 'owner';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -153,7 +153,7 @@ function BusinessProfilePage() {
         <h1 className="text-xl font-bold text-gray-900 mb-1">Business Profile</h1>
         <p className="text-sm text-gray-400 mb-6">Your business name, type, photo, and Google review link</p>
 
-        {isStaff && (
+        {isReadOnly && (
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mb-6">
             <span className="text-purple-500 text-lg shrink-0">{'\u2139\uFE0F'}</span>
             <p className="text-xs text-purple-700">
@@ -173,7 +173,7 @@ function BusinessProfilePage() {
                   <span className="text-2xl font-bold text-purple-300">{(form.name || '?').charAt(0).toUpperCase()}</span>
                 )}
               </div>
-              {!isStaff && (
+              {!isReadOnly && (
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <label className="inline-block bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-colors">
@@ -208,7 +208,7 @@ function BusinessProfilePage() {
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                disabled={isStaff}
+                disabled={isReadOnly}
                 className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
                 placeholder="Your business name"
               />
@@ -220,7 +220,7 @@ function BusinessProfilePage() {
                 name="type"
                 value={form.type}
                 onChange={handleChange}
-                disabled={isStaff}
+                disabled={isReadOnly}
                 className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 <option value="salon">Salon / Spa</option>
@@ -242,7 +242,7 @@ function BusinessProfilePage() {
                   name="type_other"
                   value={form.type_other}
                   onChange={handleChange}
-                  disabled={isStaff}
+                  disabled={isReadOnly}
                   placeholder="Tell us what kind of business, e.g. Photography Studio"
                   maxLength={50}
                   className="w-full mt-2 bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200 disabled:opacity-70 disabled:cursor-not-allowed"
@@ -257,7 +257,7 @@ function BusinessProfilePage() {
                 name="google_review_url"
                 value={form.google_review_url}
                 onChange={handleChange}
-                disabled={isStaff}
+                disabled={isReadOnly}
                 className={'w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed ' +
                   (googleUrlError ? 'ring-2 ring-red-300 focus:ring-red-300' : 'focus:ring-purple-200')}
                 placeholder="https://g.page/r/.../review"
@@ -268,7 +268,7 @@ function BusinessProfilePage() {
               <p className="text-xs text-gray-400 mt-1.5">
                 {'Customers who leave a positive review get redirected here to post it on Google.'}
               </p>
-              {!isStaff && (
+              {!isReadOnly && (
                 <>
                   <button
                     type="button"
@@ -297,7 +297,7 @@ function BusinessProfilePage() {
             <p className="text-sm text-red-500 bg-red-50 rounded-xl px-4 py-3">{error}</p>
           )}
 
-          {!isStaff && (
+          {!isReadOnly && (
             <div className="flex items-center gap-3">
               <button
                 type="submit"
@@ -314,7 +314,7 @@ function BusinessProfilePage() {
         </form>
 
         <div className="mt-6">
-          <GoogleNumbersCard readOnly={isStaff} />
+          <GoogleNumbersCard readOnly={isReadOnly} />
         </div>
       </div>
     </DashboardLayout>

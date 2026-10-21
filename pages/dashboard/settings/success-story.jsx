@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/settings/success-story.jsx
  * The owner's Success Story: two short questions, an optional testimonial,
  * and explicit, separate permissions. Their results are attached
@@ -89,7 +89,7 @@ function ResultsPreview({ results }) {
 
 function SuccessStoryPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const isReadOnly = user?.role !== 'owner';
 
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
@@ -112,12 +112,12 @@ function SuccessStoryPage() {
   }
 
   useEffect(function() {
-    if (isStaff) { setLoading(false); return; }
+    if (isReadOnly) { setLoading(false); return; }
     api.get('/business/my-success-story')
       .then(function(res) { setInfo(res.data.data); fill(res.data.data); })
       .catch(function() { setError('Could not load this page. Please refresh.'); })
       .finally(function() { setLoading(false); });
-  }, [isStaff]);
+  }, [isReadOnly]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -173,7 +173,7 @@ function SuccessStoryPage() {
         <h1 className="text-xl font-bold text-gray-900 mb-1">Share your success story</h1>
         <p className="text-sm text-gray-400 mb-6">Two short questions. We supply the numbers; you supply the story.</p>
 
-        {isStaff ? (
+        {isReadOnly ? (
           <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 text-xs text-purple-700">
             Only the business owner can share a success story.
           </div>

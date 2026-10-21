@@ -1,10 +1,15 @@
-﻿/**
+/**
  * pages/dashboard/team.jsx
- * Owner-only. Two sections on one page (previously split across
- * /dashboard/team and /dashboard/staff-performance):
- *   1. Team Accounts â€” real logins (owner/staff), full access control.
- *      Collapsed by default (most businesses only need Staff Directory).
- *   2. Staff Performance â€” the lightweight, no-login Staff Directory,
+ * Open to owner and branch_manager (backend scopes listStaff/createStaff/etc.
+ * per role -- an owner sees and manages every branch_manager and staff
+ * account in the business; a branch_manager sees and manages only the
+ * staff accounts assigned to their own location(s), and can never create
+ * or touch another branch_manager). Two sections on one page (previously
+ * split across /dashboard/team and /dashboard/staff-performance):
+ *   1. Team Accounts -- real logins (branch_manager/staff), full access
+ *      control, including per-staff permissions. Collapsed by default
+ *      (most single-location businesses only need Staff Directory).
+ *   2. Staff Performance -- the lightweight, no-login Staff Directory,
  *      merged with its performance numbers, plus search + sort.
  */
 
@@ -12,10 +17,11 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import QRCode from 'react-qr-code';
 import DashboardLayout from '../../components/DashboardLayout';
 import withAuth from '../../components/withAuth';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../lib/api';
 
 function fmtDate(d) {
-  if (!d) return '\u2014';
+  if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -110,7 +116,7 @@ function StaffQrCard({ staffMember, baseQrUrl, businessName, onCopy, copied }) {
   return (
     <div className="flex flex-col items-center gap-1.5 pt-3">
       {!baseQrUrl ? (
-        <p className="text-xs text-gray-400 py-4">{'Loading QR\u2026'}</p>
+        <p className="text-xs text-gray-400 py-4">{'Loading QR…'}</p>
       ) : (
         <>
           <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
@@ -133,23 +139,77 @@ function StaffQrCard({ staffMember, baseQrUrl, businessName, onCopy, copied }) {
   );
 }
 
-function AddStaffAccountModal({ onClose, onCreated }) {
+// Fixed permission checklist for a 'staff' account -- keep in sync with
+// STAFF_PERMISSION_KEYS in business.controller.js and requirePermission.js.
+var PERMISSION_OPTIONS = [
+  { key: 'send_requests',    label: 'Send review requests' },
+  { key: 'manage_customers', label: 'Manage customers' },
+  { key: 'reply_feedback',   label: 'Reply to feedback' },
+  { key: 'manage_winback',   label: 'Send win-back reminders' },
+];
+
+function AddTeamMemberModal({ onClose, onCreated, locations, isOwner, isMultiLocation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  // Only an owner at a multi-location business ever gets to pick the role --
+  // a branch_manager can only ever create staff, and a single-location
+  // business has no branch_manager concept at all.
+  const canPickRole = isOwner && isMultiLocation;
+  const [role, setRole] = useState('staff');
+  const [locationIds, setLocationIds] = useState([]);
+  const [permissions, setPermissions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // A staff account needs exactly one location when the owner is assigning
+  // it directly (a branch_manager creating staff needs no picker at all --
+  // the backend auto-scopes to their own location).
+  const needsLocationPicker = isOwner && isMultiLocation;
+
+  function toggleLocation(id) {
+    setLocationIds(function(prev) {
+      if (role === 'staff') {
+        // Staff belongs to exactly one location -- picking a new one
+        // replaces the selection instead of adding to it.
+        return prev[0] === id ? [] : [id];
+      }
+      return prev.includes(id) ? prev.filter(function(x) { return x !== id; }) : [...prev, id];
+    });
+  }
+
+  function togglePermission(key) {
+    setPermissions(function(prev) {
+      return prev.includes(key) ? prev.filter(function(p) { return p !== key; }) : [...prev, key];
+    });
+  }
 
   var handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!name.trim()) { setError('Name is required.'); return; }
     if (!email.trim()) { setError('Email is required.'); return; }
+    if (!phone.trim()) { setError('Phone number is required.'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (needsLocationPicker && role === 'staff' && locationIds.length === 0) {
+      setError('Pick the location this staff member belongs to.');
+      return;
+    }
 
     setSaving(true);
     try {
-      var res = await api.post('/business/staff', { name: name.trim(), email: email.trim(), password });
+      var payload = {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+      };
+      if (canPickRole) payload.role = role;
+      if (needsLocationPicker) payload.location_ids = locationIds;
+      if ((canPickRole ? role : 'staff') === 'staff') payload.permissions = permissions;
+
+      var res = await api.post('/business/staff', payload);
       onCreated(res.data.data);
       onClose();
     } catch (err) {
@@ -159,29 +219,101 @@ function AddStaffAccountModal({ onClose, onCreated }) {
     }
   };
 
+  var effectiveRole = canPickRole ? role : 'staff';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-bold text-gray-900 mb-4">Add Staff Account</h2>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-bold text-gray-900 mb-4">Add Team Member</h2>
         <form onSubmit={handleSubmit}>
-          {error && <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>}
+          {error && <div className="alert-error mb-4"><span>{'⚠'}</span><span>{error}</span></div>}
+
+          {canPickRole && (
+            <div className="mb-3">
+              <label className="label">Role</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setRole('branch_manager'); setLocationIds([]); }}
+                  className={'flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ' + (role === 'branch_manager' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500')}
+                >
+                  Branch Manager
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setRole('staff'); setLocationIds([]); }}
+                  className={'flex-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ' + (role === 'staff' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500')}
+                >
+                  Staff
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {role === 'branch_manager'
+                  ? 'Full control of the location(s) you assign below.'
+                  : "Limited to the permissions you grant below, within one location."}
+              </p>
+            </div>
+          )}
+
           <div className="mb-3">
             <label className="label">Name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Staff member's name" />
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Their name" />
           </div>
           <div className="mb-3">
             <label className="label">Email</label>
             <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="them@example.com" />
           </div>
-          <div className="mb-5">
+          <div className="mb-3">
+            <label className="label">Phone</label>
+            <input type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="For the WhatsApp invite" />
+          </div>
+          <div className="mb-3">
             <label className="label">Temporary Password</label>
             <input type="text" className="input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
             <p className="text-[10px] text-gray-400 mt-1">They'll be asked to set their own password on first login.</p>
           </div>
+
+          {needsLocationPicker && (
+            <div className="mb-3">
+              <label className="label">{effectiveRole === 'staff' ? 'Location' : 'Location(s)'}</label>
+              <div className="flex flex-col gap-1.5 max-h-32 overflow-y-auto border border-gray-100 rounded-xl p-2">
+                {locations.length === 0 ? (
+                  <p className="text-xs text-gray-400 px-1 py-1">No locations yet.</p>
+                ) : locations.map(function(loc) {
+                  var checked = locationIds.includes(loc._id);
+                  return (
+                    <label key={loc._id} className="flex items-center gap-2 px-1 py-1 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" checked={checked} onChange={() => toggleLocation(loc._id)} />
+                      {loc.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {effectiveRole === 'staff' && (
+            <div className="mb-5">
+              <label className="label">Permissions</label>
+              <div className="flex flex-col gap-1.5 border border-gray-100 rounded-xl p-2">
+                {PERMISSION_OPTIONS.map(function(opt) {
+                  var checked = permissions.includes(opt.key);
+                  return (
+                    <label key={opt.key} className="flex items-center gap-2 px-1 py-1 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" checked={checked} onChange={() => togglePermission(opt.key)} />
+                      {opt.label}
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Viewing customers, reviews, and feedback is always included.</p>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button type="button" onClick={onClose} disabled={saving} className="btn-secondary flex-1 justify-center">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">
-              {saving ? 'Adding...' : 'Add Account'}
+              {saving ? 'Adding...' : 'Add'}
             </button>
           </div>
         </form>
@@ -190,13 +322,54 @@ function AddStaffAccountModal({ onClose, onCreated }) {
   );
 }
 
+function PermissionEditor({ member, onSaved }) {
+  const [permissions, setPermissions] = useState(member.permissions || []);
+  const [saving, setSaving] = useState(false);
+
+  async function togglePermission(key) {
+    var next = permissions.includes(key) ? permissions.filter(function(p) { return p !== key; }) : [...permissions, key];
+    setPermissions(next);
+    setSaving(true);
+    try {
+      await api.patch('/business/staff/' + member._id + '/permissions', { permissions: next });
+      onSaved(member._id, next);
+    } catch (e) {
+      setPermissions(permissions); // revert on failure
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {PERMISSION_OPTIONS.map(function(opt) {
+        var checked = permissions.includes(opt.key);
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            disabled={saving}
+            onClick={() => togglePermission(opt.key)}
+            className={'text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors disabled:opacity-50 ' + (checked ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-400')}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 var SORT_OPTIONS = [
-  { key: 'name_asc',      label: 'Name (A\u2013Z)' },
+  { key: 'name_asc',      label: 'Name (A–Z)' },
   { key: 'most_handled',  label: 'Most customers handled' },
   { key: 'highest_positive', label: 'Highest positive %' },
 ];
 
 function TeamPage() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
+
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -204,6 +377,7 @@ function TeamPage() {
   const [removingId, setRemovingId] = useState(null);
   const [toast, setToast] = useState('');
   const [showTeamAccounts, setShowTeamAccounts] = useState(false);
+  const [locations, setLocations] = useState([]);
 
   // -- Staff Performance (Staff Directory + its stats, merged) -------------
   const [directory,        setDirectory]        = useState([]);
@@ -224,6 +398,14 @@ function TeamPage() {
       setQrData(res.data && res.data.data ? res.data.data : null);
     }).catch(function() {});
   }, []);
+
+  useEffect(function() {
+    api.get('/locations').then(function(res) {
+      setLocations(res.data && res.data.data ? res.data.data : []);
+    }).catch(function() {});
+  }, []);
+
+  var isMultiLocation = locations.length > 1;
 
   var baseQrUrl = (qrData && typeof window !== 'undefined')
     ? window.location.origin + '/qr/' + qrData.qr_token
@@ -252,7 +434,7 @@ function TeamPage() {
       (results[1].data.data ?? []).forEach(function(s) { map[s.name] = s; });
       setStatsByName(map);
     } catch (e) {
-      // silent â€” this section is optional, don't block the page over it
+      // silent -- this section is optional, don't block the page over it
     } finally {
       setDirectoryLoading(false);
     }
@@ -294,7 +476,7 @@ function TeamPage() {
       var res = await api.get('/business/staff');
       setStaff(res.data.data ?? []);
     } catch (e) {
-      setError('Failed to load staff accounts.');
+      setError('Failed to load team accounts.');
     } finally {
       setLoading(false);
     }
@@ -302,25 +484,36 @@ function TeamPage() {
 
   useEffect(() => { load(); }, []);
 
-  var handleCreated = (newStaff) => {
-    setStaff((prev) => [newStaff, ...prev]);
-    setToast('Staff account created.');
+  var handleCreated = (newMember) => {
+    setStaff((prev) => [newMember, ...prev]);
+    setToast((newMember.role === 'branch_manager' ? 'Branch manager' : 'Staff') + ' account created.');
     setTimeout(() => setToast(''), 3000);
     setShowTeamAccounts(true);
   };
 
   var handleRemove = async (id) => {
-    if (!window.confirm('Remove this staff member? They will no longer be able to log in.')) return;
+    if (!window.confirm('Remove this team member? They will no longer be able to log in.')) return;
     setRemovingId(id);
     try {
       await api.delete('/business/staff/' + id);
       setStaff((prev) => prev.filter((s) => s._id !== id));
     } catch (e) {
-      setError('Failed to remove staff account.');
+      setError('Failed to remove this account.');
     } finally {
       setRemovingId(null);
     }
   };
+
+  function handlePermissionsSaved(id, nextPermissions) {
+    setStaff((prev) => prev.map((s) => (s._id === id ? { ...s, permissions: nextPermissions } : s)));
+  }
+
+  function locationNames(locationIds) {
+    if (!locationIds || locationIds.length === 0) return null;
+    var byId = {};
+    locations.forEach(function(l) { byId[l._id] = l.name; });
+    return locationIds.map(function(id) { return byId[id] || byId[id && id._id] || null; }).filter(Boolean).join(', ');
+  }
 
   var visibleDirectory = useMemo(function() {
     var list = directory.map(function(d) {
@@ -349,13 +542,21 @@ function TeamPage() {
 
   return (
     <DashboardLayout>
-      {showAdd && <AddStaffAccountModal onClose={() => setShowAdd(false)} onCreated={handleCreated} />}
-
-      {toast && (
-        <div className="alert-success mb-4"><span>{'\u2713'}</span><span>{toast}</span></div>
+      {showAdd && (
+        <AddTeamMemberModal
+          onClose={() => setShowAdd(false)}
+          onCreated={handleCreated}
+          locations={locations}
+          isOwner={isOwner}
+          isMultiLocation={isMultiLocation}
+        />
       )}
 
-      {/* -- Section 1: Team Accounts (real logins) â€” collapsed by default --- */}
+      {toast && (
+        <div className="alert-success mb-4"><span>{'✓'}</span><span>{toast}</span></div>
+      )}
+
+      {/* -- Section 1: Team Accounts (real logins) -- collapsed by default --- */}
       <button
         onClick={() => setShowTeamAccounts(function(v) { return !v; })}
         className="w-full flex items-center justify-between py-2 mb-1"
@@ -375,17 +576,19 @@ function TeamPage() {
       {showTeamAccounts && (
         <>
           <p className="text-xs text-gray-400 mb-3">
-            {'Staff can view Feedback, Reviews, Customers & QR Code \u2014 but not Settings, billing, or other staff.'}
+            {isOwner
+              ? 'Branch managers have full control of their assigned location(s). Staff get only the permissions you grant them.'
+              : "Staff you add here are scoped to your own location, with only the permissions you grant them."}
           </p>
 
           <div className="flex justify-end mb-3">
             <button onClick={() => setShowAdd(true)} className="btn-primary">
-              {'+ Add Staff Account'}
+              {'+ Add Team Member'}
             </button>
           </div>
 
           {error && (
-            <div className="alert-error mb-4"><span>{'\u26A0'}</span><span>{error}</span></div>
+            <div className="alert-error mb-4"><span>{'⚠'}</span><span>{error}</span></div>
           )}
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-10">
@@ -395,23 +598,32 @@ function TeamPage() {
               </div>
             ) : staff.length === 0 ? (
               <div className="py-16 flex flex-col items-center text-center px-6">
-                <p className="text-4xl mb-3">{'\uD83D\uDC65'}</p>
-                <p className="text-sm font-semibold text-gray-700 mb-1">No staff accounts yet</p>
-                <p className="text-xs text-gray-400">Add your first staff account to give them view access to Feedback, Reviews, and Customers.</p>
+                <p className="text-4xl mb-3">{'👥'}</p>
+                <p className="text-sm font-semibold text-gray-700 mb-1">No team accounts yet</p>
+                <p className="text-xs text-gray-400">Add a branch manager or staff account to give them their own login.</p>
               </div>
             ) : (
               staff.map((s) => (
-                <div key={s._id} className="flex items-center justify-between px-5 py-4 border-b border-gray-100 last:border-0">
-                  <div className="flex items-center gap-3">
+                <div key={s._id} className="flex items-start justify-between px-5 py-4 border-b border-gray-100 last:border-0 gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-sm shrink-0">
                       {s.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{s.name}</p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900">{s.name}</p>
+                        <span className={'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (s.role === 'branch_manager' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-500')}>
+                          {s.role === 'branch_manager' ? 'Branch Manager' : 'Staff'}
+                        </span>
+                      </div>
                       <p className="text-xs text-gray-400">{s.email}</p>
+                      {locationNames(s.location_ids) && (
+                        <p className="text-[11px] text-gray-400 mt-0.5">{locationNames(s.location_ids)}</p>
+                      )}
+                      {s.role === 'staff' && <PermissionEditor member={s} onSaved={handlePermissionsSaved} />}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0">
                     <p className="text-xs text-gray-400 hidden sm:block">{'Added ' + fmtDate(s.created_at)}</p>
                     <button
                       onClick={() => handleRemove(s._id)}
@@ -434,11 +646,11 @@ function TeamPage() {
         <h2 className="text-xl font-bold text-gray-900">Staff Performance</h2>
       </div>
       <p className="text-xs text-gray-400 mb-4">
-        {'Optional \u2014 track who\u2019s serving customers, no login needed.'}
+        {'Optional — track who’s serving customers, no login needed.'}
       </p>
 
       {directoryError && (
-        <div className="alert-error mb-3"><span>{'\u26A0'}</span><span>{directoryError}</span></div>
+        <div className="alert-error mb-3"><span>{'⚠'}</span><span>{directoryError}</span></div>
       )}
 
       <form onSubmit={handleAddDirEntry} className="flex gap-2 mb-4">
@@ -484,7 +696,7 @@ function TeamPage() {
           <div className="p-6"><p className="text-gray-400 text-sm">Loading...</p></div>
         ) : visibleDirectory.length === 0 ? (
           <div className="py-10 flex flex-col items-center text-center px-6">
-            <p className="text-3xl mb-2">{'\uD83D\uDCDB'}</p>
+            <p className="text-3xl mb-2">{'📛'}</p>
             <p className="text-sm font-semibold text-gray-700 mb-1">
               {directory.length === 0 ? 'No one in the directory yet' : 'No matches'}
             </p>
@@ -506,13 +718,13 @@ function TeamPage() {
                       <p className="text-sm font-medium text-gray-900 truncate">{s.name}</p>
                       {s.has_data ? (
                         <p className="text-[11px] text-gray-400">
-                          {s.customers_handled + ' handled \u00b7 '}
+                          {s.customers_handled + ' handled · '}
                           <span className="text-green-600 font-semibold">{s.positive_pct + '% positive'}</span>
-                          {' \u00b7 ' + s.reviews_generated + ' reviews'}
+                          {' · ' + s.reviews_generated + ' reviews'}
                         </p>
                       ) : (
                         <p className="text-[11px] text-gray-400">
-                          {s.customers_handled + ' handled \u00b7 not enough data yet'}
+                          {s.customers_handled + ' handled · not enough data yet'}
                         </p>
                       )}
                     </div>
@@ -551,4 +763,4 @@ function TeamPage() {
   );
 }
 
-export default withAuth(TeamPage, { requiredRole: 'owner' });
+export default withAuth(TeamPage);

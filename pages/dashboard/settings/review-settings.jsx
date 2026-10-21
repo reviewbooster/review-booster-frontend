@@ -13,7 +13,7 @@ import { useAuth } from '../../../context/AuthContext';
 
 function ReviewSettingsPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const isReadOnly = user?.role !== 'owner';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -73,7 +73,7 @@ function ReviewSettingsPage() {
         <h1 className="text-xl font-bold text-gray-900 mb-1">Review Settings</h1>
         <p className="text-sm text-gray-400 mb-6">Workflow and customer consent</p>
 
-        {isStaff && (
+        {isReadOnly && (
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mb-6">
             <span className="text-purple-500 text-lg shrink-0">{'\u2139\uFE0F'}</span>
             <p className="text-xs text-purple-700">
@@ -97,7 +97,7 @@ function ReviewSettingsPage() {
             <button
               type="button"
               onClick={handleToggle}
-              disabled={isStaff || saving}
+              disabled={isReadOnly || saving}
               className={"relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed " +
                 (whatsappConsentRequired ? "bg-purple-600" : "bg-gray-200")}
             >

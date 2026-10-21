@@ -766,7 +766,7 @@ function CustomersPage() {
       if (window.__rbStartDeepDive) window.__rbStartDeepDive('customers');
     }, 50);
   }, []);
-  const isStaff = user?.role === 'staff';
+  const canManageCustomers = user?.role !== 'staff' || (user?.permissions || []).includes('manage_customers');
 
   const [customers,    setCustomers]    = useState([]);
   const [total,        setTotal]        = useState(0);
@@ -1053,7 +1053,7 @@ function CustomersPage() {
                       className="w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">
                       {'Export as PDF'}
                     </button>
-                    {!isStaff && (
+                    {canManageCustomers && (
                       <>
                         <div className="h-px bg-gray-100 my-1" />
                         <p className="px-4 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Import</p>
@@ -1068,7 +1068,7 @@ function CustomersPage() {
                 </>
               )}
             </div>
-            {!isStaff && (
+            {canManageCustomers && (
               <button
                 id="tour-add-customer"
                 onClick={() => setShowAdd(true)}
@@ -1299,7 +1299,7 @@ function CustomersPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                   </svg>
                 </button>
-                {!isStaff && (
+                {canManageCustomers && (
                   <div className="relative">
                     <button
                       onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === c._id ? null : c._id); }}

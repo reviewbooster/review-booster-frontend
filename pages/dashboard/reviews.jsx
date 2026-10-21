@@ -78,7 +78,7 @@ function channelLabel(ch) {
   return ch;
 }
 
-function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, referringId }) {
+function ReviewDetailModal({ review, idx, onClose, onThankAndRefer, referringId }) {
   if (!review) return null;
   var cust = review.customer_id || {};
   var name = cust.name || 'Anonymous';
@@ -150,18 +150,16 @@ function ReviewDetailModal({ review, idx, onClose, isStaff, onThankAndRefer, ref
           )}
         </div>
 
-        {!isStaff && (
-          <div className="px-5 pb-5 space-y-2">
-            {cust.phone && (
-              <button
-                onClick={function() { onThankAndRefer(review); }}
-                disabled={referringId === review._id}
-                className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-50">
-                {referringId === review._id ? '\u2026' : <>{'\uD83D\uDC65'} Thank + Refer on WhatsApp</>}
-              </button>
-            )}
-          </div>
-        )}
+        <div className="px-5 pb-5 space-y-2">
+          {cust.phone && (
+            <button
+              onClick={function() { onThankAndRefer(review); }}
+              disabled={referringId === review._id}
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-50">
+              {referringId === review._id ? '\u2026' : <>{'\uD83D\uDC65'} Thank + Refer on WhatsApp</>}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -184,7 +182,6 @@ function fillTemplate(template, vars) {
 
 function ReviewsPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
   const [thankReferTemplate, setThankReferTemplate] = useState('');
 
   useEffect(function() {
@@ -419,7 +416,6 @@ function ReviewsPage() {
         review={selectedReview}
         idx={selectedIdx}
         onClose={function() { setSelectedReview(null); }}
-        isStaff={isStaff}
         onThankAndRefer={handleThankAndRefer}
         referringId={referringId} />
 

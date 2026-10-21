@@ -31,7 +31,7 @@ function stripReferralInfoAndLinkToken(template) {
 
 function MessageTemplatesPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const isReadOnly = user?.role !== 'owner';
 
   useEffect(function() {
     try {
@@ -104,7 +104,7 @@ function MessageTemplatesPage() {
           {'Just write the middle part of your message below \u2014 the greeting and the link are added automatically, so you never have to type or worry about them.'}
         </p>
 
-        {isStaff ? (
+        {isReadOnly ? (
           <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
             <span className="text-purple-500 text-lg shrink-0">{'\u2139\uFE0F'}</span>
             <p className="text-xs text-purple-700">

@@ -11,6 +11,7 @@ import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
 import PlanLockedPanel from '../../components/PlanLockedPanel';
 import { waLinkProps } from '../../lib/waLink';
+import { useAuth } from '../../context/AuthContext';
 
 // "Hi {name}," is always the start of the message -- fixed so personalization
 // can never get accidentally deleted, same pattern as the Review Request
@@ -33,6 +34,8 @@ function daysSince(d) {
 }
 
 function WinBackPage() {
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
   const [settings, setSettings] = useState(null);
   const [due,      setDue]      = useState([]);
   const [summary,  setSummary]  = useState({ due_count: 0, returned_count: 0 });
@@ -158,6 +161,14 @@ function WinBackPage() {
       )}
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+        {!isOwner && (
+          <div className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mb-4">
+            <span className="text-purple-500 text-lg shrink-0">{'\u2139\uFE0F'}</span>
+            <p className="text-xs text-purple-700">
+              {'Only the business owner can change these settings. You can still see who\u2019s due and send reminders below.'}
+            </p>
+          </div>
+        )}
         <div id="tour-winback-settings" className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-semibold text-gray-900">Enable win-back reminders</p>
@@ -165,6 +176,7 @@ function WinBackPage() {
           </div>
           <button
             type="button"
+            disabled={!isOwner}
             onClick={function() { setEnabled(function(v) { return !v; }); }}
             className={'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 shrink-0 ' + (enabled ? 'bg-purple-600' : 'bg-gray-300')}
           >
@@ -177,6 +189,7 @@ function WinBackPage() {
           <input
             className="input" type="number" min="1"
             value={inactiveDays}
+            disabled={!isOwner}
             onChange={function(e) { setInactiveDays(e.target.value); }}
           />
           <p className="text-xs text-gray-400 mt-1">We suggested a starting point based on your business type -- change it any time.</p>
@@ -191,6 +204,7 @@ function WinBackPage() {
               rows={3}
               maxLength={480}
               value={messageBody}
+              disabled={!isOwner}
               onChange={function(e) { setMessageBody(e.target.value); }}
             />
           </div>
@@ -205,6 +219,7 @@ function WinBackPage() {
             </div>
             <button
               type="button"
+              disabled={!isOwner}
               onClick={function() { setOfferEnabled(function(v) { return !v; }); }}
               className={'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 shrink-0 ' + (offerEnabled ? 'bg-purple-600' : 'bg-gray-300')}
             >
@@ -218,6 +233,7 @@ function WinBackPage() {
                 maxLength={200}
                 placeholder="e.g. 15% off your next visit"
                 value={offerText}
+                disabled={!isOwner}
                 onChange={function(e) { setOfferText(e.target.value); }}
               />
               {offerText.trim() && (
@@ -239,7 +255,7 @@ function WinBackPage() {
             </div>
             <button
               type="button"
-              disabled={!googleReviewUrl}
+              disabled={!googleReviewUrl || !isOwner}
               onClick={function() { setLinkEnabled(function(v) { return !v; }); }}
               className={'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 shrink-0 disabled:opacity-40 ' + (linkEnabled ? 'bg-purple-600' : 'bg-gray-300')}
             >
@@ -248,9 +264,11 @@ function WinBackPage() {
           </div>
         </div>
 
-        <button onClick={handleSave} disabled={saving} className="btn-primary w-full justify-center">
+        {isOwner && (
+          <button onClick={handleSave} disabled={saving} className="btn-primary w-full justify-center">
           {saving ? 'Saving...' : saved ? '\u2713 Saved' : 'Save Settings'}
         </button>
+      )}
       </div>
 
       <div id="tour-winback-due" className="flex items-center justify-between mb-3">
@@ -309,4 +327,4 @@ function WinBackPage() {
   );
 }
 
-export default withAuth(WinBackPage, { requiredRole: 'owner' });
+export default withAuth(WinBackPage);

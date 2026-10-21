@@ -184,7 +184,7 @@ function buildPages(page, total) {
 }
 
 // -- Detail / Reply modal -----------------------------------------------------
-function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onStageChange, onMarkSent })  {
+function FeedbackDetailModal({ item, onClose, onResolve, resolving, canReplyFeedback, canSendRequests, canUseAiTemplates, onStageChange, onMarkSent })  {
   const [reply,  setReply]  = useState('');
   const [copied, setCopied] = useState(false);
   const [suggesting, setSuggesting] = useState(null); // null, or the template key currently loading
@@ -495,7 +495,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                     </svg>
                     {'Reply sent \u2014 see Timeline above'}
                   </p>
-                  {!isStaff && status !== 'Resolved' && (
+                  {canReplyFeedback && status !== 'Resolved' && (
                     <button type="button" onClick={function() { setComposingNew(true); }}
                       className="text-[10px] font-semibold text-purple-600 hover:text-purple-700 mt-2">
                       {'Send another reply'}
@@ -540,7 +540,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
               ) : (
                 <>
                   <label className="block text-xs font-semibold text-gray-700 mb-1.5">Your Reply</label>
-                  {!isStaff && (
+                  {canUseAiTemplates && (
                     <div className="flex gap-1.5 mb-2 flex-wrap">
                       {TEMPLATE_OPTIONS.map(function(t) {
                         var isSuggested = t.key === suggestedTemplate;
@@ -568,17 +568,17 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                   />
                   <div className="flex gap-2 mt-2">
                     {customer.phone && (
-                      <a href={'https://wa.me/' + customer.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(buildContextualMessage())} {...waLinkProps()} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'whatsapp', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                      <a href={'https://wa.me/' + customer.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(buildContextualMessage())} {...waLinkProps()} onClick={function() { if (reply.trim() && canReplyFeedback && onMarkSent) onMarkSent(item._id, 'whatsapp', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + ((reply.trim() && canReplyFeedback) ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
                         WhatsApp
                       </a>
                     )}
                     {customer.phone && (
-                      <a href={'sms:' + customer.phone + '?body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'sms', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                      <a href={'sms:' + customer.phone + '?body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && canReplyFeedback && onMarkSent) onMarkSent(item._id, 'sms', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + ((reply.trim() && canReplyFeedback) ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
                         SMS
                       </a>
                     )}
                     {customer.email && (
-                      <a href={'mailto:' + customer.email + '?subject=' + encodeURIComponent('Following up on your feedback') + '&body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && onMarkSent) onMarkSent(item._id, 'email', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + (reply.trim() ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
+                      <a href={'mailto:' + customer.email + '?subject=' + encodeURIComponent('Following up on your feedback') + '&body=' + encodeURIComponent(buildContextualMessage())} onClick={function() { if (reply.trim() && canReplyFeedback && onMarkSent) onMarkSent(item._id, 'email', reply); }} className={'flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-xl transition-colors ' + ((reply.trim() && canReplyFeedback) ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-gray-100 text-gray-300 pointer-events-none')}>
                         Email
                       </a>
                     )}
@@ -600,7 +600,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
               />
               <button
                 onClick={handleSaveNotes}
-                disabled={notesSaving}
+                disabled={notesSaving || !canReplyFeedback}
                 className="w-full mt-2 flex items-center justify-center gap-2 text-sm font-semibold py-3 rounded-xl transition-colors bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50">
                 {notesSaving ? 'Saving...' : (notesSaved ? '\u2713 Saved' : 'Save Note')}
               </button>
@@ -623,7 +623,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                           setReply('Hi ' + customerName + ', we hope we\'ve been able to resolve your concern! Could you let us know if everything looks good now?');
                         }
                       }}
-                      disabled={updatingStage}
+                      disabled={updatingStage || !canReplyFeedback}
                       className={'flex-1 text-xs font-semibold py-2.5 rounded-xl transition-colors ' +
                         (isCurrent ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}
                     >
@@ -634,7 +634,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
                 {onResolve && (
                   <button
                     onClick={function() { onResolve(item._id, resolvedBy); }}
-                    disabled={resolving === item._id}
+                    disabled={resolving === item._id || !canReplyFeedback}
                     className="flex-1 text-xs font-semibold py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white transition-colors flex items-center justify-center gap-1.5">
                     {resolving === item._id ? <><span className="spinner" />{' Marking\u2026'}</> : '\u2713 Mark as Resolved'}
                   </button>
@@ -642,7 +642,7 @@ function FeedbackDetailModal({ item, onClose, onResolve, resolving, isStaff, onS
               </div>
             </>
           )}
-          {!isStaff && status === 'Resolved' && (
+          {canSendRequests && status === 'Resolved' && (
             <>
               <button
                 onClick={handleResend}
@@ -676,7 +676,9 @@ function FeedbackPage() {
       if (window.__rbStartDeepDive) window.__rbStartDeepDive('feedback');
     }, 50);
   }, []);
-  const isStaff = user?.role === 'staff';
+  const canReplyFeedback = user?.role !== 'staff' || (user?.permissions || []).includes('reply_feedback');
+  const canSendRequests = user?.role !== 'staff' || (user?.permissions || []).includes('send_requests');
+  const canUseAiTemplates = user?.role === 'owner';
   const [activeTab,   setActiveTab]   = useState('new');
   const [items,       setItems]       = useState([]);
   const [total,       setTotal]       = useState(0);
@@ -967,7 +969,9 @@ function FeedbackPage() {
           onClose={function() { setViewItem(null); }}
           onResolve={markResolved}
           resolving={resolving}
-          isStaff={isStaff}
+          canReplyFeedback={canReplyFeedback}
+        canSendRequests={canSendRequests}
+        canUseAiTemplates={canUseAiTemplates}
           onStageChange={handleStageChange}
           onMarkSent={handleMarkSent} />
       )}

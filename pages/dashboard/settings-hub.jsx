@@ -32,7 +32,7 @@ function HubCard({ id, href, icon, title, description }) {
 
 function SettingsHubPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const canSeeTeam = user?.role === 'owner' || user?.role === 'branch_manager';
 
   useEffect(function() {
     setTimeout(function() {
@@ -115,7 +115,7 @@ function SettingsHubPage() {
           title="Account & Security"
           description="Password, sign out, account info"
         />
-        {!isStaff && (
+        {canSeeTeam && (
           <HubCard
             href="/dashboard/team"
             icon={

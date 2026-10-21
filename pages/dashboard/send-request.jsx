@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/dashboard/send-request.jsx
  * Fast-path customer search + Send Review Request -- reachable from the
  * raised center button on mobile, and from anywhere else in the app.
@@ -274,7 +274,8 @@ function SendRequestModal({ customer, onClose, onSent }) {
 // -- Send Request Page (search -> pick or add -> send) --------------------------
 function SendRequestPage() {
   const { user } = useAuth();
-  const isStaff = user?.role === 'staff';
+  const canManageCustomers = user?.role !== 'staff' || (user?.permissions || []).includes('manage_customers');
+  const canSendRequests    = user?.role !== 'staff' || (user?.permissions || []).includes('send_requests');
 
   const [search,     setSearch]     = useState('');
   const [results,    setResults]    = useState([]);
@@ -306,6 +307,18 @@ function SendRequestPage() {
     setToast(msg);
     setTimeout(() => setToast(''), 3000);
   };
+
+  if (!canSendRequests) {
+    return (
+      <DashboardLayout>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+          <p className="text-3xl mb-2">{'\uD83D\uDD12'}</p>
+          <p className="text-sm font-semibold text-gray-700 mb-1">No access to send review requests</p>
+          <p className="text-xs text-gray-400">Ask your branch manager or owner to grant you this permission from the Team page.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -393,7 +406,7 @@ function SendRequestPage() {
               </button>
             ))
           )}
-          {!isStaff && (
+          {canManageCustomers && (
             <button
               onClick={() => setShowAdd(true)}
               className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50/60 transition-colors duration-100 text-purple-600 font-semibold text-sm"
