@@ -32,7 +32,7 @@ function HubCard({ href, icon, title, description }) {
 function GrowthHubPage() {
   const { user } = useAuth();
   useEffect(function() { localStorage.setItem('rb_visited_growth', '1'); }, []);
-  const isStaff = user?.role === 'staff';
+  const isOwner = user?.role === 'owner';
 
   return (
     <DashboardLayout>
@@ -64,7 +64,7 @@ function GrowthHubPage() {
           title="Referrals"
           description="Manage your customer referral program"
         />
-        {!isStaff && (
+        {isOwner && (
           <HubCard
             href="/dashboard/refer-a-business"
             icon={
@@ -76,8 +76,7 @@ function GrowthHubPage() {
             description="Refer another business to ReviewBooster"
           />
         )}
-        {!isStaff && (
-          <HubCard
+        <HubCard
             href="/dashboard/win-back"
             icon={
               <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
@@ -87,7 +86,6 @@ function GrowthHubPage() {
             title="Win-Back"
             description="Re-engage customers who haven't been back in a while"
           />
-        )}
         <HubCard
           href="/dashboard/analytics"
           icon={
