@@ -205,7 +205,7 @@ function DashboardPage() {
   // Total verified referrals -- quiet, all-time count for the summary card below.
   useEffect(() => {
     if (user?.role === 'super_admin') return;
-    const branchQuery = (user?.role === 'branch_manager' && user?.active_location_id)
+    const branchQuery = user?.active_location_id
       ? '?location_id=' + user.active_location_id
       : '';
     api.get('/referrals/stats' + branchQuery)
