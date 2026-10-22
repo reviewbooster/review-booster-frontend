@@ -85,7 +85,7 @@ function channelLabel(ch) {
   return ch;
 }
 
-function ReviewDetailModal({ review, idx, onClose, onThankAndRefer, referringId }) {
+function ReviewDetailModal({ review, idx, onClose, onThankAndRefer, referringId, isPrivate, onFollowUp, followUpId }) {
   if (!review) return null;
   var cust = review.customer_id || {};
   var name = cust.name || 'Anonymous';
@@ -158,12 +158,20 @@ function ReviewDetailModal({ review, idx, onClose, onThankAndRefer, referringId 
         </div>
 
         <div className="px-5 pb-5 space-y-2">
-          {cust.phone && (
+          {cust.phone && !isPrivate && (
             <button
               onClick={function() { onThankAndRefer(review); }}
               disabled={referringId === review._id}
               className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-green-200 text-green-600 bg-green-50 hover:bg-green-100 transition-colors disabled:opacity-50">
               {referringId === review._id ? '…' : <>{'👥'} Thank + Refer on WhatsApp</>}
+            </button>
+          )}
+          {cust.phone && isPrivate && (
+            <button
+              onClick={function() { onFollowUp(review); }}
+              disabled={followUpId === review._id}
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50">
+              {followUpId === review._id ? '…' : <>{'💬'} Follow Up on WhatsApp</>}
             </button>
           )}
         </div>
@@ -178,6 +186,8 @@ var DEFAULT_THANK_REFER_TEMPLATE = 'Hi {{name}}, thank you so much for the {{rat
 // thank-you with no referral ask/link, so the button still does something
 // useful instead of being blocked outright.
 var PLAIN_THANK_YOU_TEMPLATE = 'Hi {{name}}, thank you so much for the {{rating}}-star rating! We really appreciate you taking the time to share your feedback.';
+
+var PLAIN_FOLLOW_UP_TEMPLATE = 'Hi {{name}}, thank you for sharing your feedback with us. We're sorry to hear your experience fell short, and we'd like to make it right -- could you share a bit more so we can follow up?';
 
 function fillTemplate(template, vars) {
   var result = template;
@@ -229,6 +239,8 @@ function OwnerReviewsPage() {
   const [error,          setError]          = useState('');
   const [selectedReview, setSelectedReview] = useState(null);
   const [selectedIdx,    setSelectedIdx]    = useState(0);
+  const [selectedIsPrivate, setSelectedIsPrivate] = useState(false);
+  const [followUpId,     setFollowUpId]     = useState(null);
   const [exportLoading,  setExportLoading]  = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [referringId,    setReferringId]    = useState(null);
@@ -440,6 +452,19 @@ function OwnerReviewsPage() {
   var googlePct    = totalReviews > 0 ? Math.round((googleCount  / totalReviews) * 100) : 0;
   var privatePct   = totalReviews > 0 ? Math.round((privateCount / totalReviews) * 100) : 0;
 
+  var handleFollowUp = async function(r) {
+    if (!r.customer_id || !r.customer_id.phone || followUpId) return;
+    setFollowUpId(r._id);
+    try {
+      var msg = fillTemplate(PLAIN_FOLLOW_UP_TEMPLATE, { name: r.customer_id.name, rating: r.rating });
+      var waUrl = 'https://wa.me/' + r.customer_id.phone.replace(/^\+/, '') + '?text=' + encodeURIComponent(msg);
+      window.location.href = waUrl;
+    } catch (err) {
+      window.alert(err.response?.data?.error || 'Could not open WhatsApp right now.');
+    }
+    setFollowUpId(null);
+  };
+
   var totalPages = Math.ceil(total / LIMIT);
   var hasActiveFilters = !!(filter.rating || filter.channel || search || locationId || dateMode === 'range' || (dateMode === 'preset' && selectedDays != null) || sort !== 'newest');
 
@@ -453,9 +478,12 @@ function OwnerReviewsPage() {
       <ReviewDetailModal
         review={selectedReview}
         idx={selectedIdx}
+        isPrivate={selectedIsPrivate}
         onClose={function() { setSelectedReview(null); }}
         onThankAndRefer={handleThankAndRefer}
-        referringId={referringId} />
+        onFollowUp={handleFollowUp}
+        referringId={referringId}
+        followUpId={followUpId} />
 
       {/* Location filter + unified toolbar */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -786,7 +814,7 @@ function OwnerReviewsPage() {
 
                 <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                   <button
-                    onClick={function() { setSelectedReview(r); setSelectedIdx((page-1)*LIMIT + i); }}
+                    onClick={function() { setSelectedReview(r); setSelectedIdx((page-1)*LIMIT + i); setSelectedIsPrivate(false); }}
                     className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
                     View Details
                   </button>
@@ -896,7 +924,7 @@ function OwnerReviewsPage() {
 
                   <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
                     <button
-                      onClick={function() { setSelectedReview(r); setSelectedIdx((privatePage-1)*PRIVATE_LIMIT + i); }}
+                      onClick={function() { setSelectedReview(r); setSelectedIdx((privatePage-1)*PRIVATE_LIMIT + i); setSelectedIsPrivate(true); }}
                       className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
                       View Details
                     </button>
