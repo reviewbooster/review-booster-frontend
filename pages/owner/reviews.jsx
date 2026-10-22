@@ -238,6 +238,7 @@ function OwnerReviewsPage() {
   const [privateLoading, setPrivateLoading] = useState(true);
   const [privateFetching,setPrivateFetching]= useState(false);
   const [privateError,   setPrivateError]   = useState('');
+  const [activeTab, setActiveTab] = useState('google'); // 'google' | 'private'
 
   const dateDropdownRef = useRef(null);
   const sortMenuRef     = useRef(null);
@@ -703,9 +704,27 @@ function OwnerReviewsPage() {
 
       {error && <div className="alert-error mb-4"><span>{'⚠'}</span><span>{error}</span></div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Google Reviews</p>
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={function() { setActiveTab('google'); }}
+          className={'px-4 py-2 rounded-xl text-xs font-semibold transition-colors ' +
+            (activeTab === 'google' ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-900')}
+        >
+          {'Google Reviews (' + googleCount + ')'}
+        </button>
+        <button
+          type="button"
+          onClick={function() { setActiveTab('private'); }}
+          className={'px-4 py-2 rounded-xl text-xs font-semibold transition-colors ' +
+            (activeTab === 'private' ? 'bg-purple-600 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-900')}
+        >
+          {'Private Feedback (' + privateCount + ')'}
+        </button>
+      </div>
+
+      {activeTab === 'google' && (
+        <>
       {/* Reviews list */}
       <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
         (fetching ? 'opacity-50 pointer-events-none' : '')}>
@@ -812,10 +831,11 @@ function OwnerReviewsPage() {
         </div>
       )}
 
-      </div>
+        </>
+      )}
 
-      <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Private Feedback</p>
+      {activeTab === 'private' && (
+        <>
         <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
           (privateFetching ? 'opacity-50 pointer-events-none' : '')}>
           {privateError && <div className="alert-error m-3"><span>{'⚠'}</span><span>{privateError}</span></div>}
@@ -919,8 +939,8 @@ function OwnerReviewsPage() {
             )}
           </div>
         )}
-      </div>
-      </div>
+        </>
+      )}
 
     </OwnerDashboardLayout>
   );
