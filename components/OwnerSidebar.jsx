@@ -1,4 +1,4 @@
-/**
+﻿/**
  * components/OwnerSidebar.jsx
  *
  * Phase 2 (Owner Dashboard & Multi-Location spec, section 4): the Owner
@@ -28,15 +28,17 @@ import { useAuth } from "../context/AuthContext";
 import ChangePasswordModal from "./ChangePasswordModal";
 
 const OWNER_NAV = [
-  { href: "/owner/overview",  label: "Overview",           icon: "home" },
-  { href: "/owner/locations", label: "Locations",          icon: "pin" },
-  { href: "/owner/analytics", label: "Analytics",          icon: "chart" },
-  { href: "/owner/reviews",   label: "Reviews",             icon: "star" },
-  { href: "/owner/campaigns", label: "Campaigns",          icon: "flag" },
-  { href: "/owner/team",      label: "Team & Permissions", icon: "users" },
-  { href: "/owner/reports",   label: "Reports",             icon: "doc" },
-  { href: "/owner/settings",  label: "Settings",            icon: "gear" },
+  { href: "/owner/overview",  label: "Overview",           icon: "home",  group: "business" },
+  { href: "/owner/locations", label: "Locations",          icon: "pin",   group: "business" },
+  { href: "/owner/analytics", label: "Analytics",          icon: "chart", group: "business" },
+  { href: "/owner/reviews",   label: "Reviews",            icon: "star",  group: "business" },
+  { href: "/owner/campaigns", label: "Review Requests",    icon: "flag",  group: "operations" },
+  { href: "/owner/team",      label: "Team & Permissions", icon: "users", group: "management" },
+  { href: "/owner/reports",   label: "Reports",            icon: "doc",   group: "management" },
+  { href: "/owner/settings",  label: "Settings",           icon: "gear",  group: "management" },
 ];
+
+const GROUP_LABELS = { business: "Business", operations: "Operations", management: "Management" };
 
 // The 4 real destinations on the mobile bottom bar; everything past this
 // (Campaigns, Team, Reports, Settings, Switch) lives behind "More".
@@ -189,9 +191,15 @@ export default function OwnerSidebar() {
         )}
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {OWNER_NAV.map(function(item) {
+          {OWNER_NAV.map(function(item, idx) {
             var active = isActive(item.href);
-            return (
+            var showGroupHeader = idx === 0 || OWNER_NAV[idx - 1].group !== item.group;
+            return [
+              showGroupHeader ? (
+                <p key={item.href + "-group"} className={"px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wide " + (idx === 0 ? "mb-1.5" : "mt-4 mb-1.5")}>
+                  {GROUP_LABELS[item.group]}
+                </p>
+              ) : null,
               <Link
                 key={item.href}
                 href={item.href}
@@ -201,7 +209,7 @@ export default function OwnerSidebar() {
                 <Icon name={item.icon} active={active} />
                 <span>{item.label}</span>
               </Link>
-            );
+            ];
           })}
 
           <div className="pt-2 mt-2 border-t border-gray-100">
@@ -350,9 +358,15 @@ export default function OwnerSidebar() {
           </button>
         </div>
         <div className="px-3 py-3">
-          {OWNER_NAV.filter(function(item) { return MOBILE_PRIMARY.indexOf(item.href) === -1; }).map(function(item) {
+          {OWNER_NAV.filter(function(item) { return MOBILE_PRIMARY.indexOf(item.href) === -1; }).map(function(item, idx, arr) {
             var active = isActive(item.href);
-            return (
+            var showGroupHeader = idx === 0 || arr[idx - 1].group !== item.group;
+            return [
+              showGroupHeader ? (
+                <p key={item.href + "-group"} className={"px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wide " + (idx === 0 ? "mb-1.5" : "mt-4 mb-1.5")}>
+                  {GROUP_LABELS[item.group]}
+                </p>
+              ) : null,
               <Link
                 key={item.href}
                 href={item.href}
@@ -363,7 +377,7 @@ export default function OwnerSidebar() {
                 <Icon name={item.icon} active={active} />
                 <span>{item.label}</span>
               </Link>
-            );
+            ];
           })}
           <div className="pt-2 mt-2 border-t border-gray-100">
             <button

@@ -33,6 +33,7 @@ function HubCard({ id, href, icon, title, description }) {
 function SettingsHubPage() {
   const { user } = useAuth();
   const canSeeTeam = user?.role === 'owner' || user?.role === 'branch_manager';
+  const canManageLocations = user?.role === 'owner';
 
   useEffect(function() {
     setTimeout(function() {
@@ -115,6 +116,19 @@ function SettingsHubPage() {
           title="Account & Security"
           description="Password, sign out, account info"
         />
+        {canManageLocations && (
+          <HubCard
+            href="/owner/locations"
+            icon={
+              <svg width="20" height="20" fill="none" stroke="#7C3AED" strokeWidth="1.8" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s7-6.73 7-12a7 7 0 10-14 0c0 5.27 7 12 7 12z" />
+                <circle cx="12" cy="9" r="2.5" />
+              </svg>
+            }
+            title="Locations"
+            description="Add branches and open the Owner Dashboard"
+          />
+        )}
         {canSeeTeam && (
           <HubCard
             href="/dashboard/team"

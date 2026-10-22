@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/owner/reviews.jsx
  *
  * Phase 5 (Owner Dashboard spec, "Reviews, Analytics and Campaigns",
@@ -232,11 +232,18 @@ function OwnerReviewsPage() {
   const [exportLoading,  setExportLoading]  = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [referringId,    setReferringId]    = useState(null);
+  const [privateReviews, setPrivateReviews] = useState([]);
+  const [privateTotal,   setPrivateTotal]   = useState(0);
+  const [privatePage,    setPrivatePage]    = useState(1);
+  const [privateLoading, setPrivateLoading] = useState(true);
+  const [privateFetching,setPrivateFetching]= useState(false);
+  const [privateError,   setPrivateError]   = useState('');
 
   const dateDropdownRef = useRef(null);
   const sortMenuRef     = useRef(null);
   const firstLoadRef    = useRef(true);
   const LIMIT = 10;
+  const PRIVATE_LIMIT = 5;
   const today = new Date().toISOString().slice(0, 10);
 
   // Resolve the current date selection into {start_date, end_date} or null (all time)
@@ -310,11 +317,32 @@ function OwnerReviewsPage() {
 
   useEffect(function() { load(); }, [load]);
 
+  const loadPrivate = useCallback(async function() {
+    setPrivateFetching(true);
+    setPrivateError('');
+    try {
+      var params = buildFilterParams();
+      params.set('page', privatePage);
+      params.set('limit', PRIVATE_LIMIT);
+      params.set('sort', sort);
+      var res = await api.get('/reviews/private?' + params.toString());
+      setPrivateReviews(res.data.data ?? []);
+      setPrivateTotal(res.data.total ?? 0);
+    } catch (e) {
+      setPrivateError('Failed to load private feedback.');
+    } finally {
+      setPrivateLoading(false);
+      setPrivateFetching(false);
+    }
+  }, [privatePage, sort, buildFilterParams]);
+
+  useEffect(function() { loadPrivate(); }, [loadPrivate]);
+
   var handleFilterChange = function(key, val) {
     setFilter(function(f) { return Object.assign({}, f, { [key]: val }); });
-    setPage(1);
+    setPage(1); setPrivatePage(1);
   };
-  var handleSearch = function(val) { setSearch(val); setPage(1); };
+  var handleSearch = function(val) { setSearch(val); setPage(1); setPrivatePage(1); };
 
   var handleClearAll = function() {
     setFilter({ rating: '', channel: '' });
@@ -324,7 +352,7 @@ function OwnerReviewsPage() {
     setSelectedDays(null);
     setRangeStart('');
     setRangeEnd('');
-    setPage(1);
+    setPage(1); setPrivatePage(1);
   };
 
   var handleCustomDaysApply = function() {
@@ -334,7 +362,7 @@ function OwnerReviewsPage() {
       setSelectedDays(n);
       setDateDropdownOpen(false);
       setCustomDaysInput('');
-      setPage(1);
+      setPage(1); setPrivatePage(1);
     }
   };
 
@@ -344,7 +372,7 @@ function OwnerReviewsPage() {
     setRangeError('');
     setDateMode('range');
     setDateDropdownOpen(false);
-    setPage(1);
+    setPage(1); setPrivatePage(1);
   };
 
   var handleExport = async function(format) {
@@ -432,7 +460,7 @@ function OwnerReviewsPage() {
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <select
           value={locationId}
-          onChange={function(e) { setLocationId(e.target.value); setPage(1); }}
+          onChange={function(e) { setLocationId(e.target.value); setPage(1); setPrivatePage(1); }}
           className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 font-medium outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer shrink-0"
         >
           <option value="">All locations</option>
@@ -468,7 +496,7 @@ function OwnerReviewsPage() {
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={function() { setSort(opt.key); setSortMenuOpen(false); setPage(1); }}
+                    onClick={function() { setSort(opt.key); setSortMenuOpen(false); setPage(1); setPrivatePage(1); }}
                     className={'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ' +
                       (sort === opt.key ? 'text-purple-600 font-semibold' : 'text-gray-600')}>
                     {opt.label}
@@ -532,7 +560,7 @@ function OwnerReviewsPage() {
                 return (
                   <button
                     key={opt.label}
-                    onClick={function() { setDateMode('preset'); setSelectedDays(opt.days); setPage(1); }}
+                    onClick={function() { setDateMode('preset'); setSelectedDays(opt.days); setPage(1); setPrivatePage(1); }}
                     className={'w-full text-left px-4 py-2 text-[12px] font-medium transition-colors ' +
                       (dateMode === 'preset' && selectedDays === opt.days ? 'bg-purple-50 text-purple-700' : 'text-gray-600 hover:bg-gray-50')}>
                     {opt.label}
@@ -675,6 +703,9 @@ function OwnerReviewsPage() {
 
       {error && <div className="alert-error mb-4"><span>{'⚠'}</span><span>{error}</span></div>}
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Google Reviews</p>
       {/* Reviews list */}
       <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
         (fetching ? 'opacity-50 pointer-events-none' : '')}>
@@ -780,6 +811,116 @@ function OwnerReviewsPage() {
           )}
         </div>
       )}
+
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Private Feedback</p>
+        <div className={'bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-4 transition-opacity duration-150 ' +
+          (privateFetching ? 'opacity-50 pointer-events-none' : '')}>
+          {privateError && <div className="alert-error m-3"><span>{'⚠'}</span><span>{privateError}</span></div>}
+          {privateLoading ? (
+            Array.from({ length: 5 }).map(function(_, i) {
+              return (
+                <div key={i} className="flex items-start gap-3 px-4 py-4 border-b border-gray-100 last:border-0">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="flex gap-2">
+                      <div className="h-3.5 bg-gray-200 rounded-full animate-pulse w-24" />
+                      <div className="h-4 bg-gray-100 rounded-full animate-pulse w-14" />
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded-full animate-pulse w-20" />
+                    <div className="h-3 bg-gray-100 rounded-full animate-pulse w-48" />
+                  </div>
+                </div>
+              );
+            })
+          ) : privateReviews.length === 0 ? (
+            <div className="py-16 flex flex-col items-center text-center px-6">
+              <p className="text-4xl mb-3">{'💬'}</p>
+              <p className="text-sm font-semibold text-gray-700 mb-1">No private feedback yet</p>
+              <p className="text-xs text-gray-400">
+                {hasActiveFilters ? 'Try adjusting your filters.' : 'Private feedback appears here when a customer leaves feedback that is not posted to Google.'}
+              </p>
+            </div>
+          ) : (
+            privateReviews.map(function(r, i) {
+              return (
+                <div key={r._id}
+                  className="flex items-start gap-3 px-4 py-3.5 border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors duration-100">
+
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 mt-0.5"
+                    style={{ backgroundColor: avatarBg((privatePage-1)*PRIVATE_LIMIT + i) }}>
+                    {(r.customer_id && r.customer_id.name ? r.customer_id.name : 'A').charAt(0).toUpperCase()}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {(r.customer_id && r.customer_id.name) ? r.customer_id.name : 'Anonymous'}
+                      </p>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-400">
+                        Private
+                      </span>
+                      <span className="text-[10px] text-gray-400 ml-auto shrink-0">{fmtDate(r.created_at)}</span>
+                    </div>
+                    <StarRow rating={r.rating} />
+                    {(r.feedback_text || r.public_review_text) && (
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed"
+                        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {r.feedback_text || r.public_review_text}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                    <button
+                      onClick={function() { setSelectedReview(r); setSelectedIdx((privatePage-1)*PRIVATE_LIMIT + i); }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-lg border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors">
+                      View Details
+                    </button>
+                  </div>
+
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {privateTotal > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-gray-400 order-2 sm:order-1">
+              {'Showing ' + ((privatePage-1)*PRIVATE_LIMIT+1) + ' to ' + Math.min(privatePage*PRIVATE_LIMIT, privateTotal) + ' of ' + privateTotal.toLocaleString()}
+            </p>
+            {Math.ceil(privateTotal / PRIVATE_LIMIT) > 1 && (
+              <div className="flex items-center gap-0.5 order-1 sm:order-2">
+                <button onClick={function() { setPrivatePage(function(p) { return p-1; }); }} disabled={privatePage===1}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
+                  {'‹'}
+                </button>
+                {buildPages(privatePage, Math.ceil(privateTotal / PRIVATE_LIMIT)).map(function(p) {
+                  return p === '_d1' || p === '_d2' ? (
+                    <span key={p} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">{'…'}</span>
+                  ) : (
+                    <button key={p} onClick={function() { setPrivatePage(p); }}
+                      className={'w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors ' +
+                        (p === privatePage ? 'text-white' : 'text-gray-500 hover:bg-gray-100')}
+                      style={p === privatePage ? { backgroundColor: '#7C3AED' } : {}}>
+                      {p}
+                    </button>
+                  );
+                })}
+                <button onClick={function() { setPrivatePage(function(p) { return p+1; }); }} disabled={privatePage===Math.ceil(privateTotal / PRIVATE_LIMIT)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors">
+                  {'›'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      </div>
 
     </OwnerDashboardLayout>
   );

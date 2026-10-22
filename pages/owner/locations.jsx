@@ -1,4 +1,4 @@
-/**
+﻿/**
  * pages/owner/locations.jsx
  *
  * Phase 3 (Locations and Team, spec section 7): real location management
@@ -22,6 +22,8 @@ import { useEffect, useState } from 'react';
 import OwnerDashboardLayout from '../../components/OwnerDashboardLayout';
 import withAuth from '../../components/withAuth';
 import api from '../../lib/api';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 
 function LocationFormModal({ initial, onClose, onSaved }) {
   const isEdit = !!initial;
@@ -95,7 +97,7 @@ function LocationFormModal({ initial, onClose, onSaved }) {
   );
 }
 
-function LocationCard({ loc, onEdit, onToggleStatus, onMakeDefault, busy }) {
+function LocationCard({ loc, onEdit, onToggleStatus, onMakeDefault, onOpenWorkspace, busy, opening }) {
   const isActive = loc.status === 'active';
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col gap-3">
@@ -127,6 +129,16 @@ function LocationCard({ loc, onEdit, onToggleStatus, onMakeDefault, busy }) {
         >
           Edit
         </button>
+        {isActive && (
+          <button
+            type="button"
+            disabled={opening}
+            onClick={function() { onOpenWorkspace(loc); }}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {opening ? 'Opening...' : 'Open Workspace'}
+          </button>
+        )}
         {!loc.is_default && (
           <button
             type="button"
@@ -157,6 +169,9 @@ function OwnerLocationsPage() {
   const [notice, setNotice] = useState('');
   const [modalLoc, setModalLoc] = useState(undefined); // undefined = closed, null = "add", object = "edit"
   const [busyId, setBusyId] = useState(null);
+  const [openingId, setOpeningId] = useState(null);
+  const router = useRouter();
+  const { updateUser } = useAuth();
 
   async function load() {
     try {
@@ -205,6 +220,23 @@ function OwnerLocationsPage() {
     }
   }
 
+  async function handleOpenWorkspace(loc) {
+    setOpeningId(loc._id);
+    setError('');
+    try {
+      await api.patch('/locations/active', { location_id: loc._id });
+      updateUser({ active_location_id: loc._id });
+      // Same flag select-branch.jsx sets -- marks this as a deliberate
+      // switch so withAuth's "eligible multi-location owners default to
+      // /owner" rule doesn't bounce us straight back out of /dashboard.
+      if (typeof window !== 'undefined') sessionStorage.setItem('rb_branch_switch', '1');
+      router.push('/dashboard');
+    } catch (err) {
+      setOpeningId(null);
+      setError(err.response?.data?.error || 'Could not open that location\'s workspace.');
+    }
+  }
+
   return (
     <OwnerDashboardLayout title="Locations" subtitle="Add, edit, and manage your branches">
       {modalLoc !== undefined && (
@@ -248,9 +280,11 @@ function OwnerLocationsPage() {
                 key={loc._id}
                 loc={loc}
                 busy={busyId === loc._id}
+                opening={openingId === loc._id}
                 onEdit={function(l) { setModalLoc(l); }}
                 onToggleStatus={handleToggleStatus}
                 onMakeDefault={handleMakeDefault}
+                onOpenWorkspace={handleOpenWorkspace}
               />
             );
           })}
